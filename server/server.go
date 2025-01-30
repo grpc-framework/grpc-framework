@@ -20,8 +20,8 @@ import (
 	"net"
 	"os"
 
-	grpcserver "github.com/libopenstorage/grpc-framework/pkg/grpc/server"
-	"github.com/libopenstorage/grpc-framework/pkg/util"
+	grpcserver "github.com/grpc-framework/grpc-framework/v2/pkg/grpc/server"
+	"github.com/grpc-framework/grpc-framework/v2/pkg/util"
 	"github.com/sirupsen/logrus"
 )
 

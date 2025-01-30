@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/backoff"
 )
 
 var (
@@ -42,22 +43,25 @@ func ConnectWithTimeout(address string, dialOptions []grpc.DialOption, timeout t
 		if u.Scheme == "unix" ||
 			(!u.IsAbs() && net.ParseIP(address) == nil) {
 			dialOptions = append(dialOptions,
-				grpc.WithDialer(
-					func(addr string, timeout time.Duration) (net.Conn, error) {
-						return net.DialTimeout("unix", u.Path, timeout)
-					}))
+				grpc.WithContextDialer(
+					func(ctx context.Context, addr string) (net.Conn, error) {
+						if deadline, ok := ctx.Deadline(); ok {
+							return net.DialTimeout("unix", u.Path, time.Until(deadline))
+						}
+						return net.Dial("unix", u.Path)
+					},
+				),
+			)
 		}
 	}
 
 	dialOptions = append(dialOptions,
-		grpc.WithBackoffMaxDelay(time.Second),
-		grpc.WithBlock(),
+		grpc.WithConnectParams(grpc.ConnectParams{
+			Backoff: backoff.DefaultConfig,
+		}),
 	)
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	conn, err := grpc.DialContext(ctx, address, dialOptions...)
+	conn, err := grpc.NewClient(address, dialOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to connect gRPC server %s: %v", address, err)
 	}

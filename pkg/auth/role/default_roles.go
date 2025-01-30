@@ -17,6 +17,10 @@ limitations under the License.
 
 package role
 
+import (
+	authv1 "github.com/grpc-framework/grpc-framework/v2/apis/auth/apiv1"
+)
+
 const (
 	SystemAdminRoleName = "system.admin"
 	SystemGuestRoleName = "system.guest"
@@ -25,11 +29,12 @@ const (
 var (
 	// Roles are the default roles to load on system startup
 	// Should be prefixed by `system.` to avoid collisions
-	DefaultRoles = map[string]*Role{
+	DefaultRoles = []*authv1.Role{
 		// system:admin role can run any command
-		SystemAdminRoleName: &Role{
-			Rules: []*Rule{
-				&Rule{
+		{
+			Name: SystemAdminRoleName,
+			Rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"*"},
 					Apis:     []string{"*"},
 				},
@@ -38,9 +43,10 @@ var (
 
 		// system:guest role is used for any unauthenticated user.
 		// They can only use standard volume lifecycle commands.
-		SystemGuestRoleName: &Role{
-			Rules: []*Rule{
-				&Rule{
+		{
+			Name: SystemGuestRoleName,
+			Rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"!*"},
 					Apis:     []string{"!*"},
 				},
@@ -52,5 +58,5 @@ var (
 // NewDefaultGenericRoleManager returns an RBAC API role manager
 // that supports only the roles as defined by DefaultRoles
 func NewDefaultGenericRoleManager() *GenericRoleManager {
-	return NewGenericRoleManager("", DefaultRoles)
+	return NewGenericRoleManager("", NewMapRoleStoreFromRoles(DefaultRoles))
 }

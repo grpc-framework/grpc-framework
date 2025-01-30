@@ -5,7 +5,7 @@ by this framework
 
 ## Containerize tools
 The framework provides the latest tools for generating gRPC as a single
-container called `quay.io/openstorage/grpc-framework`. Here is a
+container called `quay.io/grpc-framework/grpc-framework`. Here is a
 sample set of targets for a `Makefile` on how the container can be
 used to generate gRPC code from your protocol buffer files.
 
@@ -21,7 +21,7 @@ proto:
 		-e "PROTO_USER=$(shell id -u)" \
 		-e "PROTO_GROUP=$(shell id -g)" \
 		-e "PATH=/bin:/usr/bin:/usr/local/bin:/go/bin:/usr/local/go/bin" \
-		quay.io/openstorage/grpc-framework \
+		quay.io/grpc-framework/grpc-framework \
 			make docker-proto
 
 docker-proto:
@@ -82,7 +82,7 @@ for your application, you would need to enable it in your configuration:
 
 ```go
 import(
-	"github.com/libopenstorage/grpc-framework/server"
+	"github.com/grpc-framework/grpc-framework/v2/server"
 )
 ...
 	grpcConfig := &server.ServerConfig{

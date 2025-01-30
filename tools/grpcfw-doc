@@ -19,4 +19,4 @@ PROTO_NAME=${p%.*}
 		-I /usr/local/include \
 		-I $PROTOS_PATH/github.com/grpc-ecosystem/grpc-gateway \
 		-I $PROTOS_PATH/github.com/googleapis/googleapis \
-        --doc_out=${GOPATH}/src/github.com/libopenstorage/grpc-framework/tools/template/grpcfw.tmpl,${PROTO_NAME}.pb.md:${PROTOSRC_PATH}/. ${PROTO_FILE}
+        --doc_out=${GOPATH}/src/github.com/grpc-framework/grpc-framework/v2/tools/template/grpcfw.tmpl,${PROTO_NAME}.pb.md:${PROTOSRC_PATH}/. ${PROTO_FILE}

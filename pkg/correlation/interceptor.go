@@ -21,7 +21,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
-	"github.com/libopenstorage/grpc-framework/pkg/grpc/client"
+	"github.com/grpc-framework/grpc-framework/v2/pkg/grpc/client"
 )
 
 // ContextInterceptor represents a correlation interceptor

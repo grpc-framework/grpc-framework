@@ -18,6 +18,8 @@ package role
 
 import (
 	"context"
+
+	authv1 "github.com/grpc-framework/grpc-framework/v2/apis/auth/apiv1"
 )
 
 // RoleManager provides an implementation of the SDK Role handler
@@ -26,4 +28,16 @@ type RoleManager interface {
 	// Verify returns no error if the role exists and is allowed
 	// to run the requested method
 	Verify(ctx context.Context, roles []string, method string) error
+}
+
+// RoleStore provides an interface to storing roles
+type RoleStore interface {
+	// Get gets a role and its rules
+	Get(roleName string) (*authv1.Role, bool)
+	// Set saves a new role
+	Set(role *authv1.Role) error
+	// Delete deletes a saved role
+	Delete(roleName string)
+	// List returns a list of all the roles saved
+	List() ([]*authv1.Role, error)
 }

@@ -23,9 +23,9 @@ import (
 	"testing"
 	"time"
 
-	grpcclient "github.com/libopenstorage/grpc-framework/pkg/grpc/client"
-	appserver "github.com/libopenstorage/grpc-framework/test/app/pkg/server"
-	appapi "github.com/libopenstorage/grpc-framework/test/app/protos/apis/hello/apiv1"
+	appserver "github.com/grpc-framework/grpc-framework/v2/example/pkg/server"
+	appapi "github.com/grpc-framework/grpc-framework/v2/example/protos/apis/hello/apiv1"
+	grpcclient "github.com/grpc-framework/grpc-framework/v2/pkg/grpc/client"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
@@ -179,7 +179,7 @@ func rateLimiterShowsDenial(t *testing.T, s *testServer) bool {
 			g := appapi.NewHelloGreeterClient(conn)
 
 			for {
-				_, err = g.SayHello(ctx, &appapi.HelloGreeterSayHelloRequest{})
+				_, err = g.SayHello(ctx, &appapi.SayHelloRequest{})
 				if err != nil {
 					serverError, ok := status.FromError(err)
 					assert.True(t, ok)

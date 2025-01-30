@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"testing"
 
+	authv1 "github.com/grpc-framework/grpc-framework/v2/apis/auth/apiv1"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,14 +30,14 @@ func TestGenericRoleVerifyRules(t *testing.T) {
 	tests := []struct {
 		denied     bool
 		fullmethod string
-		rules      []*Rule
+		rules      []*authv1.Rule
 		roles      []string
 	}{
 		{
 			denied:     true,
 			fullmethod: "/openstorage.api.OpenStorageVolumes/Enumerate",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"*"},
 					Apis:     []string{"!enumerate"},
 				},
@@ -45,8 +46,8 @@ func TestGenericRoleVerifyRules(t *testing.T) {
 		{
 			denied:     true,
 			fullmethod: "/openstorage.api.OpenStorageVolumes/Enumerate",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"!openstorage.api.OpenStorageVolumes"},
 					Apis:     []string{"*"},
 				},
@@ -55,8 +56,8 @@ func TestGenericRoleVerifyRules(t *testing.T) {
 		{
 			denied:     true,
 			fullmethod: "/openstorage.api.OpenStorageVolumes/Create",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"openstorage.api.OpenStorageVolumes"},
 					Apis:     []string{"*", "!create"},
 				},
@@ -65,8 +66,8 @@ func TestGenericRoleVerifyRules(t *testing.T) {
 		{
 			denied:     true,
 			fullmethod: "/openstorage.api.OpenStorageVolumes/Create",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"openstorage.api.OpenStorageVolumes"},
 					Apis:     []string{"!create", "*"},
 				},
@@ -76,8 +77,8 @@ func TestGenericRoleVerifyRules(t *testing.T) {
 			// Denials have more priority
 			denied:     true,
 			fullmethod: "/openstorage.api.OpenStorageVolumes/Create",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"openstorage.api.OpenStorageVolumes"},
 					Apis:     []string{"!*", "create"},
 				},
@@ -86,8 +87,8 @@ func TestGenericRoleVerifyRules(t *testing.T) {
 		{
 			denied:     true,
 			fullmethod: "/openstorage.api.OpenStorageVolumes/Create",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"*", "!*"},
 					Apis:     []string{"*"},
 				},
@@ -96,8 +97,8 @@ func TestGenericRoleVerifyRules(t *testing.T) {
 		{
 			denied:     true,
 			fullmethod: "/openstorage.api.OpenStorageVolumes/Create",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"*"},
 					Apis:     []string{"*", "!*"},
 				},
@@ -106,8 +107,8 @@ func TestGenericRoleVerifyRules(t *testing.T) {
 		{
 			denied:     false,
 			fullmethod: "/openstorage.api.OpenStorageVolumes/Create",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"openstorage.api.OpenStorageVolumes"},
 					Apis:     []string{"*"},
 				},
@@ -126,13 +127,13 @@ func TestGenericRoleVerifyRules(t *testing.T) {
 		{
 			denied:     true,
 			fullmethod: "/openstorage.api.OpenStorageFutureService/SomeCallInTheFuture",
-			rules:      []*Rule{},
+			rules:      []*authv1.Rule{},
 		},
 		{
 			denied:     false,
 			fullmethod: "/openstorage.api.OpenStorageFutureService/SomeCallInTheFuture",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"openstorage.api.OpenStorageFutureService"},
 					Apis:     []string{"*"},
 				},
@@ -141,8 +142,8 @@ func TestGenericRoleVerifyRules(t *testing.T) {
 		{
 			denied:     true,
 			fullmethod: "/openstorage.api.OpenStorageFutureService/SomeCallInTheFuture",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"openstorage.api.OpenStorageFutureService"},
 					Apis:     []string{"anothercall"},
 				},
@@ -151,8 +152,8 @@ func TestGenericRoleVerifyRules(t *testing.T) {
 		{
 			denied:     true,
 			fullmethod: "/openstorage.api.OpenStorageFutureService/SomeCallInTheFuture",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"*"},
 					Apis:     []string{"anothercall"},
 				},
@@ -161,8 +162,8 @@ func TestGenericRoleVerifyRules(t *testing.T) {
 		{
 			denied:     false,
 			fullmethod: "/openstorage.api.OpenStorageFutureService/SomeCallInTheFuture",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{
 						"openstorage.api.OpenStorageCluster",
 						"openstorage.api.OpenStorageVolume",
@@ -260,14 +261,14 @@ func TestGenericRoleVerifyRulesWithTag(t *testing.T) {
 	tests := []struct {
 		denied     bool
 		fullmethod string
-		rules      []*Rule
+		rules      []*authv1.Rule
 		roles      []string
 	}{
 		{
 			denied:     true,
 			fullmethod: "/openstorage.api.OpenStorageVolumes/Enumerate",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"*"},
 					Apis:     []string{"!enumerate"},
 				},
@@ -276,8 +277,8 @@ func TestGenericRoleVerifyRulesWithTag(t *testing.T) {
 		{
 			denied:     true,
 			fullmethod: "/openstorage.api.OpenStorageVolumes/Enumerate",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"!volumes"},
 					Apis:     []string{"*"},
 				},
@@ -286,8 +287,8 @@ func TestGenericRoleVerifyRulesWithTag(t *testing.T) {
 		{
 			denied:     true,
 			fullmethod: "/openstorage.api.OpenStorageVolumes/Create",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"volumes"},
 					Apis:     []string{"*", "!create"},
 				},
@@ -296,8 +297,8 @@ func TestGenericRoleVerifyRulesWithTag(t *testing.T) {
 		{
 			denied:     true,
 			fullmethod: "/openstorage.api.OpenStorageVolumes/Create",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"volumes"},
 					Apis:     []string{"!create", "*"},
 				},
@@ -307,8 +308,8 @@ func TestGenericRoleVerifyRulesWithTag(t *testing.T) {
 			// Denials have more priority
 			denied:     true,
 			fullmethod: "/openstorage.api.OpenStorageVolumes/Create",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"volumes"},
 					Apis:     []string{"!*", "create"},
 				},
@@ -317,8 +318,8 @@ func TestGenericRoleVerifyRulesWithTag(t *testing.T) {
 		{
 			denied:     true,
 			fullmethod: "/openstorage.api.OpenStorageVolumes/Create",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"*", "!*"},
 					Apis:     []string{"*"},
 				},
@@ -327,8 +328,8 @@ func TestGenericRoleVerifyRulesWithTag(t *testing.T) {
 		{
 			denied:     true,
 			fullmethod: "/openstorage.api.OpenStorageVolumes/Create",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"*"},
 					Apis:     []string{"*", "!*"},
 				},
@@ -337,8 +338,8 @@ func TestGenericRoleVerifyRulesWithTag(t *testing.T) {
 		{
 			denied:     false,
 			fullmethod: "/openstorage.api.OpenStorageVolumes/Create",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"volumes"},
 					Apis:     []string{"*"},
 				},
@@ -357,13 +358,13 @@ func TestGenericRoleVerifyRulesWithTag(t *testing.T) {
 		{
 			denied:     true,
 			fullmethod: "/openstorage.api.OpenStorageFutureService/SomeCallInTheFuture",
-			rules:      []*Rule{},
+			rules:      []*authv1.Rule{},
 		},
 		{
 			denied:     false,
 			fullmethod: "/openstorage.api.OpenStorageFutureService/SomeCallInTheFuture",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"futureservice"},
 					Apis:     []string{"*"},
 				},
@@ -372,8 +373,8 @@ func TestGenericRoleVerifyRulesWithTag(t *testing.T) {
 		{
 			denied:     true,
 			fullmethod: "/openstorage.api.OpenStorageFutureService/SomeCallInTheFuture",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"futureservice"},
 					Apis:     []string{"anothercall"},
 				},
@@ -382,8 +383,8 @@ func TestGenericRoleVerifyRulesWithTag(t *testing.T) {
 		{
 			denied:     true,
 			fullmethod: "/openstorage.api.OpenStorageFutureService/SomeCallInTheFuture",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"*"},
 					Apis:     []string{"anothercall"},
 				},
@@ -392,8 +393,8 @@ func TestGenericRoleVerifyRulesWithTag(t *testing.T) {
 		{
 			denied:     false,
 			fullmethod: "/openstorage.api.OpenStorageFutureService/SomeCallInTheFuture",
-			rules: []*Rule{
-				&Rule{
+			rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"cluster", "volume", "futureservice"},
 					Apis:     []string{"somecallinthefuture"},
 				},
@@ -451,7 +452,7 @@ func TestGenericRoleVerifyRulesWithTag(t *testing.T) {
 		},
 	}
 
-	r := NewGenericRoleManager("openstorage.api.OpenStorage", DefaultRoles)
+	r := NewGenericRoleManager("openstorage.api.OpenStorage", NewMapRoleStoreFromRoles(DefaultRoles))
 	for _, test := range tests {
 		var err error
 		if len(test.roles) != 0 {
@@ -470,25 +471,24 @@ func TestGenericRoleVerifyRulesWithTag(t *testing.T) {
 
 func TestGenericRoleVerifyRulesWithTagAndCustomRoles(t *testing.T) {
 
-	customRoles := map[string]*Role{
-		"admin": &Role{
+	customRoles := []*authv1.Role{
+		{
 			Name: "admin",
-			Rules: []*Rule{
-				&Rule{
+			Rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"*"},
 					Apis:     []string{"*"},
 				},
 			},
 		},
-
-		"user": &Role{
+		{
 			Name: "user",
-			Rules: []*Rule{
-				&Rule{
+			Rules: []*authv1.Rule{
+				&authv1.Rule{
 					Services: []string{"futureservice"},
 					Apis:     []string{"somecallinthefuture", "anothercall"},
 				},
-				&Rule{
+				&authv1.Rule{
 					Services: []string{"volumes"},
 					Apis:     []string{"*"},
 				},
@@ -553,7 +553,7 @@ func TestGenericRoleVerifyRulesWithTagAndCustomRoles(t *testing.T) {
 		},
 	}
 
-	r := NewGenericRoleManager("openstorage.api.OpenStorage", customRoles)
+	r := NewGenericRoleManager("openstorage.api.OpenStorage", NewMapRoleStoreFromRoles(customRoles))
 	for _, test := range tests {
 		err := r.Verify(context.Background(), test.roles, test.fullmethod)
 

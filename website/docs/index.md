@@ -21,13 +21,13 @@ easily. The project provides developers with the following features:
 To add the library to your Golang application use the following command:
 
 ```bash
-go get github.com/libopenstorage/grpc-framework@latest
+go get github.com/grpc-framework/grpc-framework/v2@latest
 ```
 
 Also, use the following container version on your builds:
 
 ```
-quay.io/openstorage/grpc-framework:latest
+quay.io/grpc-framework/grpc-framework:latest
 ```
 
 Here is an example:
@@ -44,7 +44,7 @@ proto:
 		-e "PROTO_USER=$(shell id -u)" \
 		-e "PROTO_GROUP=$(shell id -g)" \
 		-e "PATH=/bin:/usr/bin:/usr/local/bin:/go/bin:/usr/local/go/bin" \
-		quay.io/openstorage/grpc-framework \
+		quay.io/grpc-framework/grpc-framework \
 			make docker-proto
 
 docker-proto:
@@ -59,7 +59,7 @@ endif
 We are working on a tutorial, but in the meantime, please check out
 the example [test program].
 
-[test program]: https://github.com/libopenstorage/grpc-framework/tree/master/test/app
+[test program]: https://github.com/grpc-framework/grpc-framework/v2/tree/master/test/app
 
 ## Projects Used
 

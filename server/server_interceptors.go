@@ -21,9 +21,9 @@ import (
 	"time"
 
 	grpc_auth "github.com/grpc-ecosystem/go-grpc-middleware/auth"
-	"github.com/libopenstorage/grpc-framework/pkg/auth"
-	"github.com/libopenstorage/grpc-framework/pkg/correlation"
-	grpcutil "github.com/libopenstorage/grpc-framework/pkg/grpc/util"
+	"github.com/grpc-framework/grpc-framework/v2/pkg/auth"
+	"github.com/grpc-framework/grpc-framework/v2/pkg/correlation"
+	grpcutil "github.com/grpc-framework/grpc-framework/v2/pkg/grpc/util"
 	"github.com/pborman/uuid"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"

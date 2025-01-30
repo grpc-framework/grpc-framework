@@ -21,8 +21,8 @@ import (
 	"io"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	"github.com/libopenstorage/grpc-framework/pkg/auth"
-	"github.com/libopenstorage/grpc-framework/pkg/auth/role"
+	"github.com/grpc-framework/grpc-framework/v2/pkg/auth"
+	"github.com/grpc-framework/grpc-framework/v2/pkg/auth/role"
 	"github.com/rs/cors"
 	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
@@ -133,36 +133,6 @@ type ServerConfig struct {
 
 	// ServerOptions hold any special gRPC server options
 	ServerOptions []grpc.ServerOption
-
-	// AuthNUnaryInterceptor installs a custom authN unary interceptor and overrides the default one
-	AuthNUnaryInterceptor grpc.UnaryServerInterceptor
-
-	// AuthNStreamInterceptor installs a custom authN stream interceptor and overrides the default one
-	AuthNStreamInterceptor grpc.StreamServerInterceptor
-
-	// AuthZUnaryInterceptor installs a custom authZ unary interceptor and overrides the default one
-	AuthZUnaryInterceptor grpc.UnaryServerInterceptor
-
-	// AuthZStreamInterceptor installs a custom authZ stream interceptor and overrides the default one
-	AuthZStreamInterceptor grpc.StreamServerInterceptor
-
-	// ExternalAuthZChecker plugs into the external authorizer framework's authZ interceptor
-	ExternalAuthZChecker ExternalAuthZChecker
-
-	// InsecureNoAuthNAuthZReqs is a list of API request types for which AuthN
-	// or AuthZ checks are skipped.  When
-	// ExternalAuthZRequestGetter.GetAuthZRequest() returns
-	// InsecureNoAuthNAuthZ, the framework ensures that the request type is also
-	// present in InsecureNoAuthNAuthZReqs  list. This adds a second level of
-	// confirmation that it is ok to skip the auth checks for this request.
-	// Refer to the documentation of ExternalAuthZRequestGetter interface for
-	// more details.
-	InsecureNoAuthNAuthZReqs []interface{}
-
-	// InsecureNoAuthZReqs is data passed by the caller for the caller's
-	// interceptor containing information on what APIs to not check for
-	// authorization
-	InsecureNoAuthZReqs []interface{}
 }
 
 var (
@@ -219,38 +189,6 @@ func (c *ServerConfig) WithDefaultRestServer(port string) *ServerConfig {
 	c.RestConfig.Port = port
 	c.RestConfig.Enabled = true
 	return c.WithRestCors(DefaultRestServerCors).WithRestPrometheus("/metrics")
-}
-
-func (c *ServerConfig) WithAuthNInterceptors(unary grpc.UnaryServerInterceptor, stream grpc.StreamServerInterceptor,
-) *ServerConfig {
-	if c == nil {
-		return c
-	}
-	c.AuthNUnaryInterceptor = unary
-	c.AuthNStreamInterceptor = stream
-	return c
-}
-
-func (c *ServerConfig) WithAuthZInterceptors(unary grpc.UnaryServerInterceptor, stream grpc.StreamServerInterceptor,
-) *ServerConfig {
-	if c == nil {
-		return c
-	}
-	c.AuthZUnaryInterceptor = unary
-	c.AuthZStreamInterceptor = stream
-	return c
-}
-
-func (c *ServerConfig) WithExternalAuthZChecker(
-	authZChecker ExternalAuthZChecker, insecureNoAuthNAuthZReqs, insecureNoAuthZReqs []interface{},
-) *ServerConfig {
-	if c == nil {
-		return c
-	}
-	c.ExternalAuthZChecker = authZChecker
-	c.InsecureNoAuthNAuthZReqs = insecureNoAuthNAuthZReqs
-	c.InsecureNoAuthZReqs = insecureNoAuthZReqs
-	return c
 }
 
 func (c *ServerConfig) WithServerUnaryInterceptors(i ...grpc.UnaryServerInterceptor) *ServerConfig {

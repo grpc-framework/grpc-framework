@@ -19,7 +19,7 @@ package auth
 import (
 	"context"
 
-	"github.com/libopenstorage/grpc-framework/pkg/correlation"
+	"github.com/grpc-framework/grpc-framework/v2/pkg/correlation"
 )
 
 func init() {

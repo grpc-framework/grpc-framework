@@ -10,13 +10,13 @@ RUN apt update
 # Install tools
 COPY ./tools/grpcfw* /usr/local/bin/
 # Add protofiles
-RUN mkdir -p /go/src/github.com/libopenstorage/grpc-framework
-COPY . /go/src/github.com/libopenstorage/grpc-framework
+RUN mkdir -p /go/src/github.com/grpc-framework/grpc-framework/v2
+COPY . /go/src/github.com/grpc-framework/grpc-framework/v2
 
 ##
 ## Install software specific to this arch
 ##
-RUN bash /go/src/github.com/libopenstorage/grpc-framework/hack/docker-build.sh
+RUN bash /go/src/github.com/grpc-framework/grpc-framework/v2/hack/docker-build.sh
 
 ##
 ## Set working directory

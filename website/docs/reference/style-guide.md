@@ -228,6 +228,6 @@ message VolumeUsage {
 
 ### Here is an example: 
 
-* Protocol buffers file: [hello.proto](https://github.com/libopenstorage/grpc-framework/blob/master/test/app/api/hello.proto)
+* Protocol buffers file: [hello.proto](https://github.com/grpc-framework/grpc-framework/v2/blob/master/test/app/api/hello.proto)
 * Documentation in markdown format: [hello.pb.md](hello.pb.md)
 

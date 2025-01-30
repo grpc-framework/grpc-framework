@@ -36,7 +36,7 @@ Populate with the sample application from the grpc-framework:
 
 ```
 curl -L \
-  https://github.com/libopenstorage/grpc-framework/archive/refs/heads/master.tar.gz | \
+  https://github.com/grpc-framework/grpc-framework/v2/archive/refs/heads/master.tar.gz | \
   tar xz --strip=3 "grpc-framework-master/test/app"
 ```
 
@@ -50,7 +50,7 @@ go mod init hello
 Now add the grpc-framework as a dependency:
 
 ```
-go get github.com/libopenstorage/grpc-framework@latest
+go get github.com/grpc-framework/grpc-framework/v2@latest
 ```
 
 Let golang determine the rest of the dependencies:

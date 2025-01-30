@@ -48,17 +48,17 @@ func (i *CredsInjector) GetRequestMetadata(context.Context, ...string) (map[stri
 		}
 		i.currentToken = token
 
-		t, _, err := new(jwt.Parser).ParseUnverified(i.currentToken, &jwt.StandardClaims{})
+		t, _, err := new(jwt.Parser).ParseUnverified(i.currentToken, &jwt.RegisteredClaims{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse authorization token: %s", err.Error())
 		}
 
-		claims, ok := t.Claims.(*jwt.StandardClaims)
+		claims, ok := t.Claims.(*jwt.RegisteredClaims)
 		if !ok {
 			return nil, fmt.Errorf("failed to get token claims")
 		}
 
-		i.currentTokenExp = claims.ExpiresAt
+		i.currentTokenExp = claims.ExpiresAt.Unix()
 	}
 
 	return map[string]string{

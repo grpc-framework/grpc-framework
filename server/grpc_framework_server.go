@@ -21,9 +21,9 @@ import (
 	"io"
 	"sync"
 
-	"github.com/libopenstorage/grpc-framework/pkg/auth/role"
-	"github.com/libopenstorage/grpc-framework/pkg/correlation"
-	grpcserver "github.com/libopenstorage/grpc-framework/pkg/grpc/server"
+	"github.com/grpc-framework/grpc-framework/v2/pkg/auth/role"
+	"github.com/grpc-framework/grpc-framework/v2/pkg/correlation"
+	grpcserver "github.com/grpc-framework/grpc-framework/v2/pkg/grpc/server"
 
 	"github.com/sirupsen/logrus"
 
@@ -75,9 +75,7 @@ func NewGrpcFrameworkServer(config *ServerConfig) (*GrpcFrameworkServer, error) 
 	// either RoleManager must be provided (this implies use of the default authZ)
 	// or explicit authZ interceptors must be provided
 	// or external authZ checker must be provided (this implies use of external_authorizer.go)
-	if config.Security.Authenticators != nil && config.Security.Role == nil &&
-		(config.AuthZUnaryInterceptor == nil || config.AuthZStreamInterceptor == nil) &&
-		config.ExternalAuthZChecker == nil {
+	if config.Security.Authenticators != nil && config.Security.Role == nil {
 		return nil, fmt.Errorf("must supply role manager when authentication is enabled and default authZ is used")
 	}
 	for issuer := range config.Security.Authenticators {
@@ -136,24 +134,8 @@ func (s *GrpcFrameworkServer) Start() error {
 		correlationInterceptor.ContextUnaryServerInterceptor,
 	}
 
-	// use caller's authN interceptor if provided
-	if s.config.AuthNUnaryInterceptor != nil {
-		unaryInterceptors = append(unaryInterceptors, s.config.AuthNUnaryInterceptor)
-	} else if s.config.Security.Authenticators != nil {
-		// use the default authN interceptor
+	if s.config.Security.Authenticators != nil {
 		unaryInterceptors = append(unaryInterceptors, grpc_auth.UnaryServerInterceptor(s.auth))
-	}
-
-	// use caller's authZ interceptor if provided
-	if s.config.AuthZUnaryInterceptor != nil {
-		// use caller's authZ interceptor as-is
-		unaryInterceptors = append(unaryInterceptors, s.config.AuthZUnaryInterceptor)
-	} else if s.config.ExternalAuthZChecker != nil {
-		// plug the caller-supplied authChecker into our external authorizer framework
-		unaryInterceptors = append(unaryInterceptors, s.externalAuthorizerUnaryInterceptor(
-			s.config.ExternalAuthZChecker, s.config.InsecureNoAuthNAuthZReqs, s.config.InsecureNoAuthZReqs))
-	} else if s.config.Security.Authenticators != nil {
-		// use our default authZ interceptor
 		unaryInterceptors = append(unaryInterceptors, s.authorizationServerUnaryInterceptor)
 	}
 
@@ -168,24 +150,8 @@ func (s *GrpcFrameworkServer) Start() error {
 		s.rwlockStreamIntercepter,
 	}
 
-	// use caller's authN interceptor if provided
-	if s.config.AuthNStreamInterceptor != nil {
-		streamInterceptors = append(streamInterceptors, s.config.AuthNStreamInterceptor)
-	} else if s.config.Security.Authenticators != nil {
-		// use the default authN interceptor
+	if s.config.Security.Authenticators != nil {
 		streamInterceptors = append(streamInterceptors, grpc_auth.StreamServerInterceptor(s.auth))
-	}
-
-	// use caller's authZ interceptor if provided
-	if s.config.AuthZStreamInterceptor != nil {
-		// use caller's authZ interceptor as-is
-		streamInterceptors = append(streamInterceptors, s.config.AuthZStreamInterceptor)
-	} else if s.config.ExternalAuthZChecker != nil {
-		// plug the caller-supplied authChecker into our external authorizer interceptor
-		streamInterceptors = append(streamInterceptors, s.externalAuthorizerStreamInterceptor(
-			s.config.ExternalAuthZChecker, s.config.InsecureNoAuthNAuthZReqs, s.config.InsecureNoAuthZReqs))
-	} else if s.config.Security.Authenticators != nil {
-		// use our default authZ interceptor
 		streamInterceptors = append(streamInterceptors, s.authorizationServerStreamInterceptor)
 	}
 

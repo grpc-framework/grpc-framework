@@ -23,7 +23,8 @@ import (
 	"context"
 	"fmt"
 
-	grpcutil "github.com/libopenstorage/grpc-framework/pkg/grpc/util"
+	authv1 "github.com/grpc-framework/grpc-framework/v2/apis/auth/apiv1"
+	grpcutil "github.com/grpc-framework/grpc-framework/v2/pkg/grpc/util"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -31,7 +32,7 @@ import (
 // GenericRoleManager contains roles to verify for RBAC
 type GenericRoleManager struct {
 	tag   string
-	roles map[string]*Role
+	store RoleStore
 }
 
 // NewGenericRoleManager returns an RBAC API role manager
@@ -41,10 +42,13 @@ type GenericRoleManager struct {
 // .   then the tag is "openstorage.api.OpenStorage".
 // This will make it possible to only use the "<service>" name in the Rule.Service for convenience.
 // If `tag` is "", then the info.FullMethod path must be provided in the Rule.Service
-func NewGenericRoleManager(tag string, roles map[string]*Role) *GenericRoleManager {
+func NewGenericRoleManager(
+	tag string,
+	roleStore RoleStore,
+) *GenericRoleManager {
 	return &GenericRoleManager{
 		tag:   tag,
-		roles: roles,
+		store: roleStore,
 	}
 }
 
@@ -53,7 +57,7 @@ func (r *GenericRoleManager) Verify(ctx context.Context, roles []string, fullmet
 
 	// Check all roles
 	for _, role := range roles {
-		if rbac, ok := r.roles[role]; ok {
+		if rbac, ok := r.store.Get(role); ok {
 			if err := r.VerifyRules(rbac.Rules,
 				r.tag,
 				fullmethod); err == nil {
@@ -66,7 +70,7 @@ func (r *GenericRoleManager) Verify(ctx context.Context, roles []string, fullmet
 }
 
 // VerifyRules checks if the rules authorize use of the API called `fullmethod`
-func (r *GenericRoleManager) VerifyRules(rules []*Rule, rootPath, fullmethod string) error {
+func (r *GenericRoleManager) VerifyRules(rules []*authv1.Rule, rootPath, fullmethod string) error {
 
 	reqService, reqApi := grpcutil.GetMethodInformation(rootPath, fullmethod)
 
@@ -103,4 +107,20 @@ func (r *GenericRoleManager) VerifyRules(rules []*Rule, rootPath, fullmethod str
 	}
 
 	return fmt.Errorf("no accessible rule to authorize access found")
+}
+
+func (r *GenericRoleManager) Set(role *authv1.Role) error {
+	return r.store.Set(role)
+}
+
+func (r *GenericRoleManager) Delete(roleName string) {
+	r.store.Delete(roleName)
+}
+
+func (r *GenericRoleManager) Get(roleName string) (*authv1.Role, bool) {
+	return r.store.Get(roleName)
+}
+
+func (r *GenericRoleManager) List() ([]*authv1.Role, error) {
+	return r.store.List()
 }

@@ -26,8 +26,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
-	"github.com/libopenstorage/grpc-framework/pkg/correlation"
-	grpcclient "github.com/libopenstorage/grpc-framework/pkg/grpc/client"
+	"github.com/grpc-framework/grpc-framework/v2/pkg/correlation"
+	grpcclient "github.com/grpc-framework/grpc-framework/v2/pkg/grpc/client"
 )
 
 type RestGateway struct {

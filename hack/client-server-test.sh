@@ -3,10 +3,10 @@
 # Requires the test app to be built
 
 
-./test/app/bin/server &
+${TOP}/example/bin/server &
 pid=$!
 sleep 3
-./test/app/bin/client
+${TOP}/example/bin/client
 ret=$?
 kill -9 $!
 exit $ret
