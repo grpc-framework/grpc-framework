@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	api "github.com/grpc-framework/grpc-framework/v2/example/protos/apis/hello/apiv1"
+	api "github.com/grpc-framework/grpc-framework/v2/example/apis/hello/apiv1"
 	"github.com/grpc-framework/grpc-framework/v2/pkg/auth"
 	"github.com/grpc-framework/grpc-framework/v2/pkg/auth/role"
 	"github.com/sirupsen/logrus"

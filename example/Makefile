@@ -1,7 +1,18 @@
-
 TAG = dev
+GRPC_FRAMEWORK_TAG=latest
+GRPC_FRAMEWORK_CONTAINER=quay.io/grpc-framework/grpc-framework:$(GRPC_FRAMEWORK_TAG)
+DOCKERCMD=docker run \
+		--privileged --rm \
+		-v $(shell pwd):/go/src/code \
+		-e "LINT_OUTPUT=$(LINT_OUTPUT)" \
+		-e "GOPATH=/go" \
+		-e "DOCKER_PROTO=yes" \
+		-e "PROTO_USER=$(shell id -u)" \
+		-e "PROTO_GROUP=$(shell id -g)" \
+		-e "PATH=/bin:/usr/bin:/usr/local/bin:/go/bin:/usr/local/go/bin" \
+		$(GRPC_FRAMEWORK_CONTAINER)
 
-all: protos server client
+all: apis server client
 
 ./bin:
 	mkdir ./bin
@@ -22,6 +33,11 @@ clean:
 verify:
 	$(TOP)/hack/client-server-test.sh
 
-.PHONY: protos
-protos:
-	$(MAKE) -C protos
+.PHONY: apis
+ifndef DOCKER_PROTO
+apis:
+	$(DOCKERCMD) make apis
+else
+apis:
+	make -C apis
+endif

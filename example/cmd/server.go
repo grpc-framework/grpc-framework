@@ -21,8 +21,8 @@ import (
 	"log"
 	"os"
 
+	api "github.com/grpc-framework/grpc-framework/v2/example/apis/hello/apiv1"
 	helloserver "github.com/grpc-framework/grpc-framework/v2/example/pkg/server"
-	api "github.com/grpc-framework/grpc-framework/v2/example/protos/apis/hello/apiv1"
 	"github.com/grpc-framework/grpc-framework/v2/pkg/auth"
 	"github.com/grpc-framework/grpc-framework/v2/pkg/util"
 	"github.com/grpc-framework/grpc-framework/v2/server"

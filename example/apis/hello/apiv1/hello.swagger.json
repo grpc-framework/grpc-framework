@@ -1,7 +1,7 @@
 {
     "openapi": "3.0.0",
     "info": {
-        "title": "example/protos/apis/hello/apiv1/hello.proto",
+        "title": "hello/apiv1/hello.proto",
         "version": "version not set"
     },
     "tags": [

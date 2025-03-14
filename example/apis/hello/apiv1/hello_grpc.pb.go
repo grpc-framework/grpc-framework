@@ -17,7 +17,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.29.3
-// source: example/protos/apis/hello/apiv1/hello.proto
+// source: hello/apiv1/hello.proto
 
 package hello
 
@@ -138,7 +138,7 @@ var HelloGreeter_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "example/protos/apis/hello/apiv1/hello.proto",
+	Metadata: "hello/apiv1/hello.proto",
 }
 
 const (
@@ -246,5 +246,5 @@ var HelloIdentity_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "example/protos/apis/hello/apiv1/hello.proto",
+	Metadata: "hello/apiv1/hello.proto",
 }

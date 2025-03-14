@@ -23,8 +23,8 @@ import (
 	"testing"
 	"time"
 
+	appapi "github.com/grpc-framework/grpc-framework/v2/example/apis/hello/apiv1"
 	appserver "github.com/grpc-framework/grpc-framework/v2/example/pkg/server"
-	appapi "github.com/grpc-framework/grpc-framework/v2/example/protos/apis/hello/apiv1"
 	grpcclient "github.com/grpc-framework/grpc-framework/v2/pkg/grpc/client"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/time/rate"

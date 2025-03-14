@@ -19,7 +19,7 @@ import (
 	"context"
 	"fmt"
 
-	api "github.com/grpc-framework/grpc-framework/v2/example/protos/apis/hello/apiv1"
+	api "github.com/grpc-framework/grpc-framework/v2/example/apis/hello/apiv1"
 	"github.com/sirupsen/logrus"
 )
 

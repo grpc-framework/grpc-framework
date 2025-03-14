@@ -4,7 +4,7 @@ export GRPC_FRAMEWORK_TAG=latest
 export GRPC_FRAMEWORK_CONTAINER=quay.io/grpc-framework/grpc-framework:$(GRPC_FRAMEWORK_TAG)
 TAG := dev
 HAS_ERRCHECK := $(shell command -v errcheck 2> /dev/null)
-PKGS := $(shell go list ./... | grep -v vendor | grep -v examples)
+PKGS := $(shell go list ./... | grep -v vendor | grep -v example)
 
 DOCKERCMD=docker run \
 		--privileged --rm \
@@ -83,7 +83,7 @@ proto:
 	$(MAKE) -C pkg proto
 
 clean:
-	$(MAKE) clean -C test/app
+	$(MAKE) clean -C example
 
 container:
 	docker build -t quay.io/grpc-framework/grpc-framework:$(TAG) .
