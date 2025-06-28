@@ -1,5 +1,5 @@
 TAG = dev
-GRPC_FRAMEWORK_TAG=latest
+GRPC_FRAMEWORK_TAG=dev.1
 GRPC_FRAMEWORK_CONTAINER=quay.io/grpc-framework/grpc-framework:$(GRPC_FRAMEWORK_TAG)
 DOCKERCMD=docker run \
 		--privileged --rm \
@@ -10,9 +10,14 @@ DOCKERCMD=docker run \
 		-e "PROTO_USER=$(shell id -u)" \
 		-e "PROTO_GROUP=$(shell id -g)" \
 		-e "PATH=/bin:/usr/bin:/usr/local/bin:/go/bin:/usr/local/go/bin" \
+		--entrypoint="" -ti \
 		$(GRPC_FRAMEWORK_CONTAINER)
 
 all: apis server client
+
+.PHONY: shell
+shell:
+	$(DOCKERCMD) /bin/bash
 
 ./bin:
 	mkdir ./bin

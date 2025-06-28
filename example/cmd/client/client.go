@@ -11,6 +11,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 
 	api "github.com/grpc-framework/grpc-framework/v2/example/apis/hello/apiv1"
 	"github.com/grpc-framework/grpc-framework/v2/pkg/auth"
@@ -88,7 +89,7 @@ func main() {
 		token: token,
 	}
 
-	dialOptions := []grpc.DialOption{grpc.WithInsecure()}
+	dialOptions := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 	if *useTls {
 		// Setup a connection
 		capool, err := x509.SystemCertPool()
@@ -104,7 +105,8 @@ func main() {
 	// Add token interceptor to add the token to all the calls
 	dialOptions = append(dialOptions, grpc.WithPerRPCCredentials(contextToken))
 
-	conn, err := grpc.Dial(*address, dialOptions...)
+	//conn, err := grpc.DialContext(context.Background(), *address, dialOptions...)
+	conn, err := grpc.NewClient(*address, dialOptions...)
 	if err != nil {
 		fmt.Printf("Error: %v", err)
 		os.Exit(1)

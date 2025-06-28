@@ -18,12 +18,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	// "log"
 	"os"
 
 	api "github.com/grpc-framework/grpc-framework/v2/example/apis/hello/apiv1"
 	helloserver "github.com/grpc-framework/grpc-framework/v2/example/pkg/server"
-	"github.com/grpc-framework/grpc-framework/v2/pkg/auth"
+	// "github.com/grpc-framework/grpc-framework/v2/pkg/auth"
 	"github.com/grpc-framework/grpc-framework/v2/pkg/util"
 	"github.com/grpc-framework/grpc-framework/v2/server"
 
@@ -39,6 +39,7 @@ func main() {
 	hello := &helloserver.HelloGreeter{}
 
 	// Security config
+	/*
 	authenticator, err := auth.NewJwtAuthenticator(&auth.JwtAuthConfig{
 		SharedSecret: []byte("mysecret"),
 	})
@@ -50,6 +51,7 @@ func main() {
 			"myissuer": authenticator,
 		},
 	}
+		*/
 
 	config := &server.ServerConfig{
 		Name:         "hello",
@@ -57,7 +59,7 @@ func main() {
 		Socket:       helloSocket,
 		AuditOutput:  os.Stdout,
 		AccessOutput: os.Stdout,
-		Security:     security,
+		//Security:     security,
 	}
 	config.
 		WithDefaultRestServer("9010").

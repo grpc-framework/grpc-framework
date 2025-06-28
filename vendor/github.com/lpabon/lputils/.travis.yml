@@ -1,0 +1,11 @@
+language: go
+matrix:
+  include:
+  - go: 1.x
+    env: OPTIONS="-race"
+  - go: 1.x
+    env: COVERAGE="true" OPTIONS=""
+script:
+- go fmt $(go list ./... | grep -v vendor) | wc -l | grep 0
+- go vet $(go list ./... | grep -v vendor)
+- go test $OPTIONS $(go list ./... | grep -v vendor)

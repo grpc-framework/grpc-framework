@@ -1,10 +1,10 @@
 export TOP=$(shell pwd)
 export GFW=$(TOP)/gfw
-export GRPC_FRAMEWORK_TAG=latest
+export GRPC_FRAMEWORK_TAG=dev
 export GRPC_FRAMEWORK_CONTAINER=quay.io/grpc-framework/grpc-framework:$(GRPC_FRAMEWORK_TAG)
 TAG := dev
 HAS_ERRCHECK := $(shell command -v errcheck 2> /dev/null)
-PKGS := $(shell go list ./... | grep -v vendor | grep -v example)
+PKGS := $(shell go list -buildvcs=false ./... | grep -v vendor | grep -v example)
 
 DOCKERCMD=docker run \
 		--privileged --rm \
@@ -34,7 +34,7 @@ build: gobuild $(SUBDIRS)
 .PHONY: gobuild
 gobuild:
 	@echo ">>> go build"
-	go build $(PKGS)
+	go build -buildvcs=false $(PKGS)
 
 .PHONY: fmt
 fmt:
@@ -107,27 +107,7 @@ container-buildx-uninstall:
 	docker buildx stop gfwbuilder
 	docker buildx rm gfwbuilder
 
-./venv:
-	python3 -m venv venv
-	bash -c "source venv/bin/activate && \
-		pip3 install --upgrade pip && \
-		pip3 install -r requirements.txt"
-	@echo "Type: 'source venv/bin/activate' to get access to mkdocs"
-
-doc-env: ./venv
-
-doc-build: doc-env
-	bash -c "source venv/bin/activate && \
-		cd website && \
-		mkdocs build"
-
-doc-serve: doc-env
-	bash -c "source venv/bin/activate && \
-		cd website && \
-		mkdocs serve"
-
 .PHONY: clean proto go-mod-publish travis-verify verify \
-	testapp test pr-verify errcheck vet fmt build \
-	doc-env doc-build doc-serve container testapp-verify \
+	test pr-verify errcheck vet fmt build container \
 	container-buildx-install container-release container-buildx-uninstall
 

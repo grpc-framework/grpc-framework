@@ -25,6 +25,7 @@ import (
 	"github.com/rs/cors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/grpc-framework/grpc-framework/v2/pkg/correlation"
 	grpcclient "github.com/grpc-framework/grpc-framework/v2/pkg/grpc/client"
@@ -127,12 +128,13 @@ func (s *RestGateway) restServerSetupHandlers() (http.Handler, error) {
 
 	// Create a router just for HTTP REST gRPC Server Gateway
 	gmux := runtime.NewServeMux()
+	fmt.Printf("address is %s\n", s.grpcServer.Address())
 
 	// Connect to gRPC unix domain socket
 	conn, err := grpcclient.Connect(
 		s.grpcServer.Address(),
 		[]grpc.DialOption{
-			grpc.WithInsecure(),
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithUnaryInterceptor(correlation.ContextUnaryClientInterceptor),
 		})
 	if err != nil {

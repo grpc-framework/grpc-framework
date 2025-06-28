@@ -8,7 +8,7 @@ RUN apt update
 ## grpc-framework additions
 ##
 # Install tools
-COPY ./tools/grpcfw* /usr/local/bin/
+COPY ./gfw/tools/grpcfw* /usr/local/bin/
 # Add protofiles
 RUN mkdir -p /go/src/github.com/grpc-framework/grpc-framework/v2
 COPY . /go/src/github.com/grpc-framework/grpc-framework/v2
