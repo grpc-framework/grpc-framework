@@ -16,7 +16,6 @@ limitations under the License.
 package client
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"net/url"
@@ -40,18 +39,8 @@ func ConnectWithTimeout(address string, dialOptions []grpc.DialOption, timeout t
 	u, err := url.Parse(address)
 	if err == nil {
 		// Check if host just has an IP
-		if u.Scheme == "unix" ||
-			(!u.IsAbs() && net.ParseIP(address) == nil) {
-			dialOptions = append(dialOptions,
-				grpc.WithContextDialer(
-					func(ctx context.Context, addr string) (net.Conn, error) {
-						if deadline, ok := ctx.Deadline(); ok {
-							return net.DialTimeout("unix", u.Path, time.Until(deadline))
-						}
-						return net.Dial("unix", u.Path)
-					},
-				),
-			)
+		if !u.IsAbs() && net.ParseIP(address) == nil {
+			address = "unix://" + address
 		}
 	}
 
@@ -63,7 +52,7 @@ func ConnectWithTimeout(address string, dialOptions []grpc.DialOption, timeout t
 
 	conn, err := grpc.NewClient(address, dialOptions...)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to connect gRPC server %s: %v", address, err)
+		return nil, fmt.Errorf("failed to connect gRPC server %s: %v", address, err)
 	}
 
 	return conn, nil

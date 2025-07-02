@@ -16,7 +16,7 @@ BUILD_PROTO_FILES:=$(addprefix $(PROTO_PATH)/, $(PROTO_FILES))
 $(PROTO_FILES): $(BUILD_PROTO_FILES)
 
 $(BUILD_PROTO_FILES):
-	@cd $(TOP) && grpcfw $@
+	@cd $(TOP) && grpcfw-go $@
 	@cd $(TOP) && grpcfw-rest $@
 	@cd $(TOP) && grpcfw-doc $@
 	@cd $(TOP) && grpcfw-lint \

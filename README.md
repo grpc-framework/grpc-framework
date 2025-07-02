@@ -1,41 +1,41 @@
-# gRPC Framework
+# Welcome to grpc-framework
 
-This framework makes it simple for developers to add gRPC and automated REST
-interfaces for their Golang applications.
+The grpc-framework enables Golang developers to create secure gRPC applications
+easily. The project provides developers with the following features:
+
+- Generate REST and swagger APIs
+- Generate Markdown documentation
+- Security
+    - Authentication (OIDC and JWT supported)
+    - Authorization (RBAC / Role Based Access Control)
+    - TLS support
+    - Auditing
+- Rate Limiter
+- Metrics for Prometheus
+- API Logging
+- proto/gRPC build container
+- And more...
 
 ## Usage
 
-Please see our [Documentation](https://libopenstorage.github.io/grpc-framework) for
-more information.
+To add the library to your Golang application use the following command:
 
-* FYI, we are in the process of creating tutorials and adding more documentation
-to the framework
-
-## grpc-framework Development
-
-### Documentation for the website
-
-* Setup the environment to write documentation
-
-```
-$ make doc-env
+```bash
+go get github.com/grpc-framework/grpc-framework/v2@latest
 ```
 
-* Bring up the webserver
+Also, use the following container version on your builds:
 
 ```
-$ make doc-serve
+quay.io/grpc-framework/grpc-framework:latest
 ```
 
-Now edit the files in the direcory `website`.
+## Projects Used
 
-* When done, build the website and add the `docs` dir to git:
+grpc-framework uses the following excellent projects in the framework:
 
-```
-$ make doc-build
-```
-
-For more information on mkdocs go to:
-
-* https://www.mkdocs.org/
-* https://squidfunk.github.io/mkdocs-material/getting-started/ 
+* [gRPC Golang](https://grpc.io/docs/languages/go/basics/)
+* [gRPC REST Gateway](https://grpc-ecosystem.github.io/grpc-gateway/)
+* [Golang JWT](https://github.com/golang-jwt/jwt)
+* [Logging with logrus](https://github.com/sirupsen/logrus)
+* [Generate Markdown documentation](https://github.com/pseudomuto/protoc-gen-doc)

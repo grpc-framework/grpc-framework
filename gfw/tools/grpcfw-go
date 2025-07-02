@@ -16,8 +16,7 @@ p="${1##*/}"
 PROTO_NAME=${p%.*}
 
 echo "GO: $PROTO_FILE"
-$PROTOC -I. \
-		-I${TOP} \
+$PROTOC -I . \
 		-I${PROTOS_PATH}/github.com/grpc-ecosystem/grpc-gateway \
 		-I${PROTOS_PATH}/github.com/googleapis/googleapis \
 		--go_out=. \
