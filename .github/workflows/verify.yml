@@ -1,0 +1,59 @@
+name: Go Build and Test
+
+on:
+  # Trigger the workflow on push events to the main branch
+  push:
+    branches:
+      - main
+  # Trigger the workflow on pull request events targeting the main branch
+  pull_request:
+    branches:
+      - main
+  # Allow manual triggering of the workflow from the GitHub Actions UI
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    # Use the latest Ubuntu runner, which comes with Go and Docker pre-installed
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        # Action to check out your repository code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        # Action to set up the Go environment.
+        # This is necessary because 'pr-verify' uses 'go mod vendor'
+        # and 'all' eventually runs Go-related commands via Docker.
+        uses: actions/setup-go@v5
+        with:
+          # Use the latest stable Go version
+          go-version: 'stable'
+          # Cache Go modules to speed up subsequent runs
+          cache: true
+
+      - name: Install git-validation
+        # The 'pr-verify' target requires 'git-validation'.
+        # This step ensures it's available on the runner.
+        run: |
+          go install github.com/vbatts/git-validation@latest
+
+      - name: Build Docker Image for Makefile Commands
+        # The 'all' target in your Makefile depends on 'docker-build' and 'docker-verify',
+        # which in turn use the 'GRPC_FRAMEWORK_CONTAINER'.
+        # This step builds that container image.
+        run: make container
+
+      - name: Run PR Verification and All Builds/Tests
+        # Execute the combined 'make pr-verify all' command.
+        # 'pr-verify' will run first, followed by 'all',
+        # which triggers 'docker-build' and 'docker-verify'.
+        run: make pr-verify all
+
+      # Optional: Add more steps as needed, for example:
+      # - name: Push Docker Image (if you want to push the built container)
+      #   if: github.ref == 'refs/heads/main' # Only push on main branch pushes
+      #   run: |
+      #     echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+      #     make container-release # Assuming container-release handles the push
