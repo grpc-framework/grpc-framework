@@ -1,5 +1,4 @@
-TAG = dev
-GRPC_FRAMEWORK_TAG=dev.1
+GRPC_FRAMEWORK_TAG=latest
 GRPC_FRAMEWORK_CONTAINER=quay.io/grpc-framework/grpc-framework:$(GRPC_FRAMEWORK_TAG)
 DOCKERCMD=docker run \
 		--privileged --rm \
