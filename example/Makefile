@@ -9,7 +9,6 @@ DOCKERCMD=docker run \
 		-e "PROTO_USER=$(shell id -u)" \
 		-e "PROTO_GROUP=$(shell id -g)" \
 		-e "PATH=/bin:/usr/bin:/usr/local/bin:/go/bin:/usr/local/go/bin" \
-		--entrypoint="" -ti \
 		$(GRPC_FRAMEWORK_CONTAINER)
 
 all: apis server client
