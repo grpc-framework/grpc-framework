@@ -1,6 +1,6 @@
 export TOP=$(shell pwd)
 export GFW=$(TOP)/gfw
-export GRPC_FRAMEWORK_TAG=dev
+export GRPC_FRAMEWORK_TAG=latest
 export GRPC_FRAMEWORK_CONTAINER=quay.io/grpc-framework/grpc-framework:$(GRPC_FRAMEWORK_TAG)
 TAG := dev
 HAS_ERRCHECK := $(shell command -v errcheck 2> /dev/null)
