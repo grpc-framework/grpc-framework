@@ -34,7 +34,14 @@ build: gobuild $(SUBDIRS)
 .PHONY: gobuild
 gobuild:
 	@echo ">>> go build"
-	go build -buildvcs=false $(PKGS)
+	CGO_ENABLED=0 go build -buildvcs=false $(PKGS)
+
+.PHONY: cmds
+cmds:
+	@echo ">>> Building commands"
+	@mkdir -p bin
+	@echo "CGO_ENABLED=0 go build ..."
+	@CGO_ENABLED=0 go list -f '{{if eq .Name "main"}}{{.Dir}}{{end}}' ./cmd/... | xargs -I{} basename {} | xargs -I{} sh -c 'CGO_ENABLED=0 go build -o bin/$(basename {}) ./cmd/$(basename {})'
 
 .PHONY: fmt
 fmt:
@@ -84,6 +91,7 @@ proto:
 
 clean:
 	$(MAKE) clean -C example
+	-rm -rf bin/
 
 container:
 	docker build -t quay.io/grpc-framework/grpc-framework:$(TAG) .
