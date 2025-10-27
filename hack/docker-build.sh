@@ -25,17 +25,17 @@ fi
 ## VERSIONS
 ## Confirm that the links are correct. Some tools change the links on newer versions
 # https://go.dev/dl/
-GFGOLANG=1.24.4
+GFGOLANG=1.25.3
 # https://github.com/grpc-ecosystem/grpc-gateway/releases
-GFGRPCGATEWAY=2.27.1
+GFGRPCGATEWAY=2.27.3
 # https://github.com/pseudomuto/protoc-gen-doc/releases
 GFPROTOCGENDOC=1.5.1
 # https://github.com/protocolbuffers/protobuf/releases
-GFPROTOC=31.1
+GFPROTOC=33.0
 
 # Get gRPC golang versions from here: https://grpc.io/docs/languages/go/quickstart/
 # Also see: https://pkg.go.dev/google.golang.org/protobuf/cmd/protoc-gen-go
-GFPROTOCGENGO=1.36.6
+GFPROTOCGENGO=1.36.10
 # Also see: https://pkg.go.dev/google.golang.org/grpc/cmd/protoc-gen-go-grpc
 GFPROTOCGENGOGRPC=1.5.1
 
