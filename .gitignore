@@ -4,3 +4,5 @@ example/bin
 client
 venv
 *.lint
+bin/
+cmd/token-generate/token-generate
