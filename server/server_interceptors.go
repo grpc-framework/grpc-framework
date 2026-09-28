@@ -71,12 +71,17 @@ func (s *GrpcFrameworkServer) auth(ctx context.Context) (context.Context, error)
 	// Audit log
 	log := correlation.NewFunctionLogger(ctx)
 	log.Out = s.auditLogOutput
+	// err may be nil when the failure has no underlying error, such as a
+	// token from an untrusted issuer.
 	auditLogWarningf := func(c codes.Code, err error, format string, a ...interface{}) error {
-		log.WithContext(ctx).WithFields(logrus.Fields{
+		fields := logrus.Fields{
 			"method": "Authentication",
 			"code":   c.String(),
-			"error":  err.Error(),
-		}).Warningf(format, a...)
+		}
+		if err != nil {
+			fields["error"] = err.Error()
+		}
+		log.WithContext(ctx).WithFields(fields).Warningf(format, a...)
 		return status.Errorf(c, format, a...)
 	}
 
