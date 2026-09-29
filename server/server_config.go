@@ -19,6 +19,8 @@ package server
 import (
 	"context"
 	"io"
+	"net/http"
+	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/grpc-framework/grpc-framework/v2/pkg/auth"
@@ -68,6 +70,23 @@ type RestServerConfig struct {
 	Port             string
 	CorsOptions      RestServerCorsConfig
 	PrometheusConfig RestServerPrometheusConfig
+
+	// MaxRequestBodyBytes caps the size of a request body. A request whose
+	// Content-Length is larger gets 413 before any handler reads it; a body
+	// of unknown length fails to read past the limit. 0: no limit.
+	MaxRequestBodyBytes int64
+
+	// Timeouts set on the http.Server. 0: no timeout. WriteTimeout also cuts
+	// streaming responses, so most callers leave it 0.
+	ReadHeaderTimeout time.Duration
+	ReadTimeout       time.Duration
+	WriteTimeout      time.Duration
+	IdleTimeout       time.Duration
+
+	// Middleware, when set, wraps the REST gateway handler, for example to
+	// apply a rate limiter. It runs before the request body is read and
+	// before MaxRequestBodyBytes is checked.
+	Middleware func(http.Handler) http.Handler
 }
 
 type RateLimiterConfig struct {

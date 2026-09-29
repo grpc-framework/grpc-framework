@@ -17,7 +17,10 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -35,6 +38,9 @@ type RestGateway struct {
 	config     ServerConfig
 	grpcServer *GrpcFrameworkServer
 	server     *http.Server
+	conn       *grpc.ClientConn
+	// done is closed when the goroutine serving the port returns
+	done chan struct{}
 }
 
 func NewRestGateway(config *ServerConfig, grpcServer *GrpcFrameworkServer) (*RestGateway, error) {
@@ -44,51 +50,114 @@ func NewRestGateway(config *ServerConfig, grpcServer *GrpcFrameworkServer) (*Res
 	}, nil
 }
 
+// Start binds the REST port and serves it in the background. The port is
+// bound when Start returns; if it cannot be bound, Start returns the error.
 func (s *RestGateway) Start() error {
-	mux, err := s.restServerSetupHandlers()
+	handler, conn, err := s.restServerSetupHandlers()
 	if err != nil {
 		return err
 	}
 
-	// Create object here so that we can access its Close receiver.
-	address := ":" + s.config.RestConfig.Port
-	s.server = &http.Server{
-		Addr:    address,
-		Handler: mux,
+	// Middleware runs first so that it can refuse a request, for example
+	// when rate limited, before the body is read.
+	restConfig := s.config.RestConfig
+	if restConfig.MaxRequestBodyBytes > 0 {
+		handler = maxBytesHandler(handler, restConfig.MaxRequestBodyBytes)
+	}
+	if restConfig.Middleware != nil {
+		handler = restConfig.Middleware(handler)
 	}
 
-	ready := make(chan bool)
-	go func() {
-		ready <- true
-		var err error
-		if s.config.Security.Tls != nil {
-			err = s.server.ListenAndServeTLS(s.config.Security.Tls.CertFile, s.config.Security.Tls.KeyFile)
-		} else {
-			err = s.server.ListenAndServe()
-		}
+	server := &http.Server{
+		Addr:              ":" + restConfig.Port,
+		Handler:           handler,
+		ReadHeaderTimeout: restConfig.ReadHeaderTimeout,
+		ReadTimeout:       restConfig.ReadTimeout,
+		WriteTimeout:      restConfig.WriteTimeout,
+		IdleTimeout:       restConfig.IdleTimeout,
+	}
 
-		if err == http.ErrServerClosed || err == nil {
-			return
+	// Load the certificate here so that an error is returned to the caller
+	if s.config.Security != nil && s.config.Security.Tls != nil {
+		cert, err := tls.LoadX509KeyPair(s.config.Security.Tls.CertFile, s.config.Security.Tls.KeyFile)
+		if err != nil {
+			conn.Close()
+			return fmt.Errorf("REST gateway unable to load TLS certificate: %w", err)
+		}
+		server.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
+	}
+
+	ln, err := net.Listen("tcp", server.Addr)
+	if err != nil {
+		conn.Close()
+		return fmt.Errorf("REST gateway unable to listen on %s: %w", server.Addr, err)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		// Serve closes the listener when it returns, but ServeTLS can fail
+		// before it calls Serve.
+		defer ln.Close()
+
+		var err error
+		if server.TLSConfig != nil {
+			err = server.ServeTLS(ln, "", "")
 		} else {
-			logrus.Fatalf("Unable to start REST gRPC Gateway: %s\n",
-				err.Error())
+			err = server.Serve(ln)
+		}
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logrus.Errorf("REST gRPC Gateway stopped: %v", err)
 		}
 	}()
-	<-ready
-	logrus.Infof("gRPC REST Gateway started on port :%s", s.config.RestConfig.Port)
+
+	s.server = server
+	s.conn = conn
+	s.done = done
+	logrus.Infof("gRPC REST Gateway started on port :%s", restConfig.Port)
 
 	return nil
 }
 
-func (s *RestGateway) Stop() {
-	if err := s.server.Close(); err != nil {
-		logrus.Fatalf("REST GW STOP error: %v", err)
+// Stop closes the REST gateway. The port is free when Stop returns.
+// It does nothing if the gateway is not running.
+func (s *RestGateway) Stop() error {
+	if s.server == nil {
+		return nil
 	}
+
+	err := s.server.Close()
+
+	// Close does not close a listener that Serve has not started using yet;
+	// Serve closes it on its way out, so wait for it.
+	<-s.done
+
+	err = errors.Join(err, s.conn.Close())
+	s.server = nil
+	s.conn = nil
+	s.done = nil
+
+	return err
+}
+
+// maxBytesHandler refuses a request whose body is larger than n bytes.
+// A request that declares a larger Content-Length gets 413 without being
+// passed on; reading past n bytes of a body of unknown length fails.
+func maxBytesHandler(h http.Handler, n int64) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.ContentLength > n {
+			http.Error(w, http.StatusText(http.StatusRequestEntityTooLarge), http.StatusRequestEntityTooLarge)
+			return
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, n)
+		h.ServeHTTP(w, r)
+	})
 }
 
 // restServerSetupHandlers sets up the handlers to the swagger ui and
-// to the gRPC REST Gateway.
-func (s *RestGateway) restServerSetupHandlers() (http.Handler, error) {
+// to the gRPC REST Gateway. It returns the connection to the gRPC server,
+// which the caller must close.
+func (s *RestGateway) restServerSetupHandlers() (http.Handler, *grpc.ClientConn, error) {
 
 	// Create an HTTP server router
 	mux := http.NewServeMux()
@@ -138,14 +207,15 @@ func (s *RestGateway) restServerSetupHandlers() (http.Handler, error) {
 			grpc.WithUnaryInterceptor(correlation.ContextUnaryClientInterceptor),
 		})
 	if err != nil {
-		return nil, fmt.Errorf("Failed to connect to gRPC handler: %v", err)
+		return nil, nil, fmt.Errorf("Failed to connect to gRPC handler: %v", err)
 	}
 
 	// Register the REST Gateway handlers
 	for _, handler := range s.config.RestServerExtensions {
 		err := handler(context.Background(), gmux, conn)
 		if err != nil {
-			return nil, err
+			conn.Close()
+			return nil, nil, err
 		}
 	}
 
@@ -159,9 +229,9 @@ func (s *RestGateway) restServerSetupHandlers() (http.Handler, error) {
 		} else {
 			c := cors.New(*s.config.RestConfig.CorsOptions.CustomOptions)
 			cmux := c.Handler(mux)
-			return cmux, nil
+			return cmux, conn, nil
 		}
 	}
 
-	return mux, nil
+	return mux, conn, nil
 }

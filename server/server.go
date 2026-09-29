@@ -156,7 +156,9 @@ func (s *Server) Start() error {
 	return nil
 }
 
-func (s *Server) Stop() {
+// Stop all servers. It returns an error if the REST gateway failed to close.
+func (s *Server) Stop() error {
+	var err error
 	if s.netServer != nil {
 		s.netServer.Stop()
 	}
@@ -164,7 +166,7 @@ func (s *Server) Stop() {
 		s.udsServer.Stop()
 	}
 	if s.restGateway != nil {
-		s.restGateway.Stop()
+		err = s.restGateway.Stop()
 	}
 	if s.accessLog != nil {
 		s.accessLog.Close()
@@ -172,6 +174,7 @@ func (s *Server) Stop() {
 	if s.auditLog != nil {
 		s.auditLog.Close()
 	}
+	return err
 }
 
 func (s *Server) Address() string {
