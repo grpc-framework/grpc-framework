@@ -132,7 +132,8 @@ func New(config *ServerConfig) (*Server, error) {
 	}, nil
 }
 
-// Start all servers
+// Start all servers. If Start fails, create a new Server with New to try
+// again: a Server cannot be started again once it has been stopped.
 func (s *Server) Start() error {
 	if s.netServer != nil {
 		if err := s.netServer.Start(); err != nil {

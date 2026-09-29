@@ -150,3 +150,48 @@ func TestServerStop(t *testing.T) {
 	assert.NotPanics(t, s.Stop)
 	assert.False(t, s.Server().IsRunning())
 }
+
+func TestServerStartAfterStop(t *testing.T) {
+	s := newTestServer(t)
+	s.Stop()
+
+	called := false
+	err := s.Server().Start(func(grpcserver *grpc.Server) {
+		called = true
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot be started again")
+	assert.False(t, called)
+	assert.False(t, s.Server().IsRunning())
+
+	err = s.Server().StartWithServer(func() *grpc.Server {
+		called = true
+		return grpc.NewServer()
+	})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot be started again")
+	assert.False(t, called)
+	assert.False(t, s.Server().IsRunning())
+}
+
+func TestServerStopBeforeServe(t *testing.T) {
+	s, err := New(&GrpcServerConfig{
+		Name:    "unit-test",
+		Net:     "tcp",
+		Address: "127.0.0.1:0",
+	})
+	assert.NoError(t, err)
+
+	// Serve returns grpc.ErrServerStopped when Stop runs before it, which
+	// must not exit the process
+	err = s.StartWithServer(func() *grpc.Server {
+		gs := grpc.NewServer()
+		gs.Stop()
+		return gs
+	})
+	assert.NoError(t, err)
+
+	// Stop waits for the goroutine calling Serve to return
+	s.Stop()
+	assert.False(t, s.IsRunning())
+}

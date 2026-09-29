@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sync"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -37,8 +38,11 @@ import (
 type RestGateway struct {
 	config     ServerConfig
 	grpcServer *GrpcFrameworkServer
-	server     *http.Server
-	conn       *grpc.ClientConn
+
+	// lock protects the fields below, set by Start and cleared by Stop
+	lock   sync.Mutex
+	server *http.Server
+	conn   *grpc.ClientConn
 	// done is closed when the goroutine serving the port returns
 	done chan struct{}
 }
@@ -52,14 +56,26 @@ func NewRestGateway(config *ServerConfig, grpcServer *GrpcFrameworkServer) (*Res
 
 // Start binds the REST port and serves it in the background. The port is
 // bound when Start returns; if it cannot be bound, Start returns the error.
+// It returns an error if the gateway is already running.
 func (s *RestGateway) Start() error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if s.server != nil {
+		return fmt.Errorf("REST gateway already running")
+	}
+
 	handler, conn, err := s.restServerSetupHandlers()
 	if err != nil {
 		return err
 	}
 
-	// Middleware runs first so that it can refuse a request, for example
-	// when rate limited, before the body is read.
+	// From the outside in:
+	//  - CORS, so that every response, refusals included, has the CORS
+	//    headers, and preflight requests are answered before Middleware.
+	//  - Middleware, so that it can refuse a request, for example when
+	//    rate limited, before the body is read.
+	//  - The request body size limit.
 	restConfig := s.config.RestConfig
 	if restConfig.MaxRequestBodyBytes > 0 {
 		handler = maxBytesHandler(handler, restConfig.MaxRequestBodyBytes)
@@ -67,6 +83,7 @@ func (s *RestGateway) Start() error {
 	if restConfig.Middleware != nil {
 		handler = restConfig.Middleware(handler)
 	}
+	handler = s.corsHandler(handler)
 
 	server := &http.Server{
 		Addr:              ":" + restConfig.Port,
@@ -122,6 +139,9 @@ func (s *RestGateway) Start() error {
 // Stop closes the REST gateway. The port is free when Stop returns.
 // It does nothing if the gateway is not running.
 func (s *RestGateway) Stop() error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	if s.server == nil {
 		return nil
 	}
@@ -144,14 +164,30 @@ func (s *RestGateway) Stop() error {
 // A request that declares a larger Content-Length gets 413 without being
 // passed on; reading past n bytes of a body of unknown length fails.
 func maxBytesHandler(h http.Handler, n int64) http.Handler {
+	// MaxBytesHandler passes on a copy of the request. The request itself
+	// must keep its body: before Go 1.27, the server checks the type of
+	// the body to send "100 Continue" and to reuse the connection.
+	limited := http.MaxBytesHandler(h, n)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.ContentLength > n {
 			http.Error(w, http.StatusText(http.StatusRequestEntityTooLarge), http.StatusRequestEntityTooLarge)
 			return
 		}
-		r.Body = http.MaxBytesReader(w, r.Body, n)
-		h.ServeHTTP(w, r)
+		limited.ServeHTTP(w, r)
 	})
+}
+
+// corsHandler wraps h with the configured CORS handler
+func (s *RestGateway) corsHandler(h http.Handler) http.Handler {
+	corsOptions := s.config.RestConfig.CorsOptions
+	if !corsOptions.Enabled {
+		return h
+	}
+	if corsOptions.CustomOptions == nil {
+		logrus.Warn("REST Cors configuration missing; skipping")
+		return h
+	}
+	return cors.New(*corsOptions.CustomOptions).Handler(h)
 }
 
 // restServerSetupHandlers sets up the handlers to the swagger ui and
@@ -221,17 +257,6 @@ func (s *RestGateway) restServerSetupHandlers() (http.Handler, *grpc.ClientConn,
 
 	// Pass all other unhandled paths to the gRPC gateway
 	mux.Handle("/", gmux)
-
-	// Enable cors
-	if s.config.RestConfig.CorsOptions.Enabled {
-		if s.config.RestConfig.CorsOptions.CustomOptions == nil {
-			logrus.Warn("REST Cors configuration missing; skipping")
-		} else {
-			c := cors.New(*s.config.RestConfig.CorsOptions.CustomOptions)
-			cmux := c.Handler(mux)
-			return cmux, conn, nil
-		}
-	}
 
 	return mux, conn, nil
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -42,8 +43,11 @@ type GrpcServer struct {
 	server   *grpc.Server
 	wg       sync.WaitGroup
 	running  bool
-	lock     sync.Mutex
-	opts     []grpc.ServerOption
+	// stopped is set by Stop. The listener is closed, so the server
+	// cannot be started again.
+	stopped bool
+	lock    sync.Mutex
+	opts    []grpc.ServerOption
 }
 
 // New creates a gRPC server on the specified port and transport.
@@ -82,6 +86,9 @@ func (s *GrpcServer) Start(register func(grpcServer *grpc.Server)) error {
 	if s.running {
 		return fmt.Errorf("Server already running")
 	}
+	if s.stopped {
+		return fmt.Errorf("%s gRPC server has been stopped and cannot be started again", s.name)
+	}
 
 	s.server = grpc.NewServer(s.opts...)
 	register(s.server)
@@ -103,6 +110,9 @@ func (s *GrpcServer) StartWithServer(server func() *grpc.Server) error {
 
 	if s.running {
 		return fmt.Errorf("Server already running")
+	}
+	if s.stopped {
+		return fmt.Errorf("%s gRPC server has been stopped and cannot be started again", s.name)
 	}
 
 	s.server = server()
@@ -137,6 +147,7 @@ func (s *GrpcServer) Stop() {
 	s.server.Stop()
 	s.wg.Wait()
 	s.running = false
+	s.stopped = true
 }
 
 // Address returns the address of the server which can be
@@ -164,7 +175,8 @@ func (s *GrpcServer) goServe(started chan<- bool) {
 		defer s.wg.Done()
 		started <- true
 		err := s.server.Serve(s.listener)
-		if err != nil {
+		// Stop can run before Serve starts
+		if err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 			logrus.Fatalf("ERROR: Unable to start %s gRPC server: %s\n",
 				s.name,
 				err.Error())
