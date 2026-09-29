@@ -16,6 +16,7 @@ limitations under the License.
 package server
 
 import (
+	"bufio"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -32,8 +33,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -159,6 +162,33 @@ func TestRestMaxRequestBodyBytes(t *testing.T) {
 	assert.Equal(t, int32(1), calls.Load())
 }
 
+func TestRestMaxRequestBodyBytesExpectContinue(t *testing.T) {
+	port := freePort(t)
+	config := newRestConfig(port, nil)
+	config.RestConfig.MaxRequestBodyBytes = 1024
+	startServer(t, config)
+
+	conn, err := net.Dial("tcp", "127.0.0.1:"+port)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	// The client waits for "100 Continue" before it sends the body, and
+	// the handler of an unknown path never reads the body. The server
+	// must answer without waiting for the body.
+	_, err = conn.Write([]byte("POST /v1/unknown HTTP/1.1\r\n" +
+		"Host: localhost\r\n" +
+		"Content-Type: application/json\r\n" +
+		"Content-Length: 10\r\n" +
+		"Expect: 100-continue\r\n\r\n"))
+	require.NoError(t, err)
+
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(3*time.Second)))
+	resp, err := http.ReadResponse(bufio.NewReader(conn), nil)
+	require.NoError(t, err, "no response from the server")
+	resp.Body.Close()
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+}
+
 func TestRestNoMaxRequestBodyBytes(t *testing.T) {
 	var calls atomic.Int32
 	port := freePort(t)
@@ -242,6 +272,64 @@ func TestRestMiddlewareRunsBeforeBodyIsRead(t *testing.T) {
 	assert.Equal(t, int32(3), middlewareCalls.Load())
 }
 
+func TestRestCorsOnRefusals(t *testing.T) {
+	const limit = 1024
+	var calls, middlewareCalls atomic.Int32
+	port := freePort(t)
+	config := newRestConfig(port, &calls)
+	config.RestConfig.MaxRequestBodyBytes = limit
+	config.RestConfig.Middleware = func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			middlewareCalls.Add(1)
+			if r.Header.Get("X-Refuse") != "" {
+				http.Error(w, "rate limited", http.StatusTooManyRequests)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+	require.True(t, config.RestConfig.CorsOptions.Enabled)
+	startServer(t, config)
+
+	do := func(method, body string, header map[string]string) *http.Response {
+		req, err := http.NewRequest(method, "http://127.0.0.1:"+port+sayHelloPath, strings.NewReader(body))
+		require.NoError(t, err)
+		req.Header.Set("Origin", "http://example.com")
+		for k, v := range header {
+			req.Header.Set(k, v)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+		return resp
+	}
+
+	// Refused by the size limit
+	resp := do(http.MethodPost, sayHelloBody(t, limit+1), nil)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, resp.StatusCode)
+	assert.NotEmpty(t, resp.Header.Get("Access-Control-Allow-Origin"))
+
+	// Refused by the middleware
+	resp = do(http.MethodPost, sayHelloBody(t, limit), map[string]string{"X-Refuse": "yes"})
+	assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode)
+	assert.NotEmpty(t, resp.Header.Get("Access-Control-Allow-Origin"))
+	assert.Equal(t, int32(0), calls.Load())
+	assert.Equal(t, int32(2), middlewareCalls.Load())
+
+	// A preflight request is answered without calling the middleware
+	resp = do(http.MethodOptions, "", map[string]string{"Access-Control-Request-Method": http.MethodPost})
+	assert.Less(t, resp.StatusCode, 300)
+	assert.NotEmpty(t, resp.Header.Get("Access-Control-Allow-Origin"))
+	assert.Equal(t, int32(2), middlewareCalls.Load())
+
+	// Allowed
+	resp = do(http.MethodPost, sayHelloBody(t, limit), nil)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.NotEmpty(t, resp.Header.Get("Access-Control-Allow-Origin"))
+	assert.Equal(t, int32(1), calls.Load())
+}
+
 func TestRestStartPortInUse(t *testing.T) {
 	port := freePort(t)
 	ln, err := net.Listen("tcp", ":"+port)
@@ -255,6 +343,12 @@ func TestRestStartPortInUse(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "REST gateway unable to listen on :"+port)
 
+	// The failed Start stopped the servers, so the same Server cannot
+	// start again
+	err = s.Start()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot be started again")
+
 	// Once the port is free, a new server starts on it
 	require.NoError(t, ln.Close())
 	s = startServer(t, newRestConfig(port, nil))
@@ -265,6 +359,10 @@ func TestRestStartPortInUse(t *testing.T) {
 }
 
 func TestRestStartStopRepeatedly(t *testing.T) {
+	// With one CPU, Stop usually runs before the goroutine serving the
+	// port starts, which is the case under test
+	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(1))
+
 	port := freePort(t)
 	for i := 0; i < 50; i++ {
 		config := newRestConfig(port, nil)
@@ -288,11 +386,46 @@ func TestRestGatewayStartStopRepeatedly(t *testing.T) {
 	gw, err := NewRestGateway(&config, s.udsServer)
 	require.NoError(t, err)
 
-	// Stop right after Start, so that Stop can run before the
-	// gateway serves the port
-	for i := 0; i < 50; i++ {
+	// Stop right after Start. With one CPU, Stop usually runs before the
+	// goroutine serving the port starts, which is the case under test.
+	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(1))
+	for i := 0; i < 200; i++ {
 		require.NoError(t, gw.Start(), "start %d", i)
 		require.NoError(t, gw.Stop(), "stop %d", i)
+	}
+
+	// The port is free after Stop returns
+	ln, err := net.Listen("tcp", ":"+config.RestConfig.Port)
+	require.NoError(t, err)
+	ln.Close()
+}
+
+func TestRestGatewayConcurrentStop(t *testing.T) {
+	s := startServer(t, newRestConfig(freePort(t), nil))
+	config := s.config
+	config.RestConfig.Port = freePort(t)
+	gw, err := NewRestGateway(&config, s.udsServer)
+	require.NoError(t, err)
+
+	for i := 0; i < 20; i++ {
+		require.NoError(t, gw.Start(), "start %d", i)
+		err := gw.Start()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "already running")
+
+		var wg sync.WaitGroup
+		errs := make([]error, 4)
+		for j := range errs {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				errs[j] = gw.Stop()
+			}()
+		}
+		wg.Wait()
+		for j, err := range errs {
+			require.NoError(t, err, "round %d, stop %d", i, j)
+		}
 	}
 
 	// The port is free after Stop returns
@@ -357,12 +490,14 @@ func TestRestTLS(t *testing.T) {
 	}()
 
 	client := &http.Client{Transport: &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
+		ForceAttemptHTTP2: true,
 	}}
 	resp, err := client.Get("https://127.0.0.1:" + port + "/v1/identity:serverVersion")
 	require.NoError(t, err)
 	resp.Body.Close()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, 2, resp.ProtoMajor)
 }
 
 func TestRestTLSBadCertificate(t *testing.T) {

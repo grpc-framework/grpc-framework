@@ -85,7 +85,8 @@ type RestServerConfig struct {
 
 	// Middleware, when set, wraps the REST gateway handler, for example to
 	// apply a rate limiter. It runs before the request body is read and
-	// before MaxRequestBodyBytes is checked.
+	// before MaxRequestBodyBytes is checked, and after CORS: CORS preflight
+	// requests are answered without calling it.
 	Middleware func(http.Handler) http.Handler
 }
 
