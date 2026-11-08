@@ -17,10 +17,13 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // testServer is a simple struct used abstract
@@ -193,5 +196,83 @@ func TestServerStopBeforeServe(t *testing.T) {
 
 	// Stop waits for the goroutine calling Serve to return
 	s.Stop()
+	assert.False(t, s.IsRunning())
+}
+
+// registerBlockingService registers the service test.Blocking with one
+// streaming method, Block. Its handler sends on entered and returns when
+// release is closed, ignoring the cancellation of its context.
+func registerBlockingService(
+	gs *grpc.Server,
+	entered chan<- struct{},
+	release <-chan struct{},
+) {
+	gs.RegisterService(&grpc.ServiceDesc{
+		ServiceName: "test.Blocking",
+		HandlerType: (*any)(nil),
+		Streams: []grpc.StreamDesc{{
+			StreamName:    "Block",
+			ServerStreams: true,
+			Handler: func(any, grpc.ServerStream) error {
+				entered <- struct{}{}
+				<-release
+				return nil
+			},
+		}},
+	}, struct{}{})
+}
+
+func TestServerStopWaitsForHandlers(t *testing.T) {
+	s, err := New(&GrpcServerConfig{
+		Name:    "unit-test",
+		Net:     "tcp",
+		Address: "127.0.0.1:0",
+	})
+	assert.NoError(t, err)
+
+	entered := make(chan struct{}, 1)
+	release := make(chan struct{})
+	err = s.Start(func(gs *grpc.Server) {
+		registerBlockingService(gs, entered, release)
+	})
+	assert.NoError(t, err)
+
+	conn, err := grpc.NewClient(s.Address(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
+	assert.NoError(t, err)
+	defer conn.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_, err = conn.NewStream(ctx, &grpc.StreamDesc{ServerStreams: true},
+		"/test.Blocking/Block")
+	assert.NoError(t, err)
+	select {
+	case <-entered:
+	case <-ctx.Done():
+		t.Fatal("the handler of the RPC was not entered")
+	}
+
+	stopped := make(chan struct{})
+	go func() {
+		s.Stop()
+		close(stopped)
+	}()
+
+	// The handler ignores the cancellation of its context, so Stop must
+	// wait until it is released.
+	select {
+	case <-stopped:
+		close(release)
+		t.Fatal("Stop returned while a handler was running")
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	close(release)
+	select {
+	case <-stopped:
+	case <-time.After(10 * time.Second):
+		t.Fatal("Stop did not return after the handler returned")
+	}
 	assert.False(t, s.IsRunning())
 }

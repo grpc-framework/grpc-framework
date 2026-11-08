@@ -79,6 +79,9 @@ func New(config *GrpcServerConfig) (*GrpcServer, error) {
 
 // Start is used to start the server.
 // It will return an error if the server is already runnig.
+// The gRPC server is created with grpc.WaitForHandlers(true) followed by
+// GrpcServerConfig.Opts, so that Stop waits for the handlers of the RPCs
+// in progress unless Opts turns it off.
 func (s *GrpcServer) Start(register func(grpcServer *grpc.Server)) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -90,7 +93,8 @@ func (s *GrpcServer) Start(register func(grpcServer *grpc.Server)) error {
 		return fmt.Errorf("%s gRPC server has been stopped and cannot be started again", s.name)
 	}
 
-	s.server = grpc.NewServer(s.opts...)
+	s.server = grpc.NewServer(
+		append([]grpc.ServerOption{grpc.WaitForHandlers(true)}, s.opts...)...)
 	register(s.server)
 
 	// Start listening for requests
@@ -100,6 +104,8 @@ func (s *GrpcServer) Start(register func(grpcServer *grpc.Server)) error {
 
 // StartWithServer is used to start the server.
 // It will return an error if the server is already runnig.
+// Stop waits for the handlers of the RPCs in progress only if server
+// returns a gRPC server created with grpc.WaitForHandlers(true).
 func (s *GrpcServer) StartWithServer(server func() *grpc.Server) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -134,6 +140,12 @@ func (s *GrpcServer) startGrpcService() {
 }
 
 // Stop is used to stop the gRPC server.
+// It closes the listener and all connections, which cancels the RPCs in
+// progress. If the gRPC server was created with grpc.WaitForHandlers(true),
+// as Start creates it, Stop then waits until the handlers of those RPCs,
+// with their interceptors, have returned; a handler that does not return
+// when its context is canceled blocks Stop. Otherwise handlers can still
+// be running when Stop returns.
 // It can be called multiple times. It does nothing if the server
 // has already been stopped.
 func (s *GrpcServer) Stop() {

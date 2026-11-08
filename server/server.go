@@ -157,7 +157,9 @@ func (s *Server) Start() error {
 	return nil
 }
 
-// Stop all servers. It returns an error if the REST gateway failed to close.
+// Stop all servers. Each gRPC server returns from Stop once the handlers
+// of its RPCs in progress have returned (see GrpcFrameworkServer.Start).
+// It returns an error if the REST gateway failed to close.
 func (s *Server) Stop() error {
 	var err error
 	if s.netServer != nil {
