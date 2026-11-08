@@ -123,6 +123,15 @@ func TestAuth(t *testing.T) {
 			wantMessage: "Unable to obtain token issuer from authorization token",
 		},
 		{
+			// Regression: a claims segment of "null" gave nil claims and
+			// no error, and TokenIssuer dereferenced them.
+			name:           "null claims",
+			ctx:            contextWithAuthorization("bearer a.bnVsbA.b"),
+			wantCode:       codes.Unauthenticated,
+			wantMessage:    "Unable to obtain token issuer from authorization token",
+			wantAuditError: "token has no claims",
+		},
+		{
 			name:        "wrong signing key",
 			ctx:         contextWithAuthorization("bearer " + newTestToken(t, testIssuer, "some-other-secret", time.Hour)),
 			wantCode:    codes.Unauthenticated,
@@ -234,8 +243,8 @@ func TestAuditAuthWarningf(t *testing.T) {
 }
 
 // TestServerSurvivesUntrustedIssuer sends a token from an untrusted issuer
-// through the full interceptor chain and checks that the server rejects it
-// and keeps serving.
+// and a token with null claims through the full interceptor chain and
+// checks that the server rejects them and keeps serving.
 func TestServerSurvivesUntrustedIssuer(t *testing.T) {
 	config := &ServerConfig{
 		Name:     "testServer",
@@ -267,6 +276,9 @@ func TestServerSurvivesUntrustedIssuer(t *testing.T) {
 	}
 
 	err = call(newTestToken(t, "evil.example.com", testSharedSecret, time.Hour))
+	assert.Equal(t, codes.Unauthenticated, status.Code(err))
+
+	err = call("a.bnVsbA.b")
 	assert.Equal(t, codes.Unauthenticated, status.Code(err))
 
 	// The server must still be up and serving authenticated callers.
