@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -272,7 +273,7 @@ func TestRest(t *testing.T) {
 }
 
 func rateLimiterShowsDenial(t *testing.T, s *testServer) bool {
-	denied := false
+	var denied atomic.Bool
 	var wg sync.WaitGroup
 	for i := 0; i < 4; i++ {
 		wg.Add(1)
@@ -290,7 +291,7 @@ func rateLimiterShowsDenial(t *testing.T, s *testServer) bool {
 
 					if serverError.Code() == codes.ResourceExhausted {
 						time.Sleep(time.Millisecond * time.Duration(i))
-						denied = true
+						denied.Store(true)
 					}
 					continue
 				}
@@ -302,7 +303,7 @@ func rateLimiterShowsDenial(t *testing.T, s *testServer) bool {
 
 	wg.Wait()
 
-	return denied
+	return denied.Load()
 }
 
 func TestServerRateLimiter(t *testing.T) {

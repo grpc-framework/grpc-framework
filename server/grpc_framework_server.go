@@ -106,10 +106,17 @@ func NewGrpcFrameworkServer(config *ServerConfig) (*GrpcFrameworkServer, error) 
 
 // Start is used to start the server.
 // It will return an error if the server is already running.
+// The gRPC server is created with grpc.WaitForHandlers(true), so that Stop
+// returns only after the handlers of the RPCs in progress have returned.
+// ServerConfig.ServerOptions can turn this off.
 func (s *GrpcFrameworkServer) Start() error {
 
+	// Stop waits for the handlers. ServerOptions come after this option
+	// so that they can change it.
+	opts := append([]grpc.ServerOption{grpc.WaitForHandlers(true)},
+		s.config.ServerOptions...)
+
 	// Setup https if certs have been provided
-	opts := s.config.ServerOptions
 	if s.config.Net != "unix" && s.config.Security.Tls != nil {
 		creds, err := credentials.NewServerTLSFromFile(
 			s.config.Security.Tls.CertFile,
@@ -198,10 +205,21 @@ func (s *GrpcFrameworkServer) Start() error {
 	return nil
 }
 
+// enableHandlingTimeHistogram runs grpc_prometheus.EnableHandlingTimeHistogram
+// once per process. It writes grpc_prometheus.DefaultServerMetrics, which
+// the interceptors of every server in the process read, so calling it again
+// when another server starts races with the RPCs of the running servers.
+var enableHandlingTimeHistogram sync.Once
+
 func (s *GrpcFrameworkServer) registerPrometheusMetrics(grpcServer *grpc.Server) {
-	// Register the gRPCs and enable latency historgram
+	// Enable the latency histogram before Register reads whether it is
+	// enabled
+	enableHandlingTimeHistogram.Do(func() {
+		grpc_prometheus.EnableHandlingTimeHistogram()
+	})
+
+	// Register the gRPCs
 	grpc_prometheus.Register(grpcServer)
-	grpc_prometheus.EnableHandlingTimeHistogram()
 
 	// Initialize the metrics
 	grpcMetrics := grpc_prometheus.NewServerMetrics()
