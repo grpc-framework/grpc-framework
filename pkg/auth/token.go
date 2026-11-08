@@ -63,6 +63,10 @@ func TokenClaims(rawtoken string) (*Claims, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Unable to get information from the claims in the token: %v", err)
 	}
+	// A claims segment of "null" unmarshals to nil claims and no error
+	if claims == nil {
+		return nil, fmt.Errorf("token has no claims")
+	}
 
 	return claims, nil
 }

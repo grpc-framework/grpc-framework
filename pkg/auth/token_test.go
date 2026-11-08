@@ -17,11 +17,13 @@ package auth
 
 import (
 	"context"
+	"encoding/base64"
 	"testing"
 	"time"
 
 	jwt "github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTokenSharedSecretSimple(t *testing.T) {
@@ -133,6 +135,43 @@ func TestTokenIssuer(t *testing.T) {
 	parsedIssuer, err := TokenIssuer(rawtoken)
 	assert.NoError(t, err)
 	assert.Equal(t, issuer, parsedIssuer)
+}
+
+// TestTokenClaimsMalformed checks that TokenClaims and TokenIssuer return
+// an error, and do not panic, for tokens whose claims segment is not a
+// JSON object. A payload of "null" once gave nil claims and no error, and
+// TokenIssuer dereferenced them.
+func TestTokenClaimsMalformed(t *testing.T) {
+	segment := func(payload string) string {
+		return base64.RawURLEncoding.EncodeToString([]byte(payload))
+	}
+	tests := []struct {
+		name  string
+		token string
+	}{
+		{name: "null payload", token: "a." + segment("null") + ".b"},
+		{name: "array payload", token: "a." + segment("[]") + ".b"},
+		{name: "string payload", token: "a." + segment(`""`) + ".b"},
+		{name: "two parts", token: "a." + segment("null")},
+		{name: "bad base64", token: "a.!!!.b"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				claims *Claims
+				err    error
+			)
+			require.NotPanics(t, func() { claims, err = TokenClaims(tc.token) })
+			assert.Error(t, err)
+			assert.Nil(t, claims)
+
+			var issuer string
+			require.NotPanics(t, func() { issuer, err = TokenIssuer(tc.token) })
+			assert.Error(t, err)
+			assert.Empty(t, issuer)
+		})
+	}
 }
 
 func TestTokenNTPDrift(t *testing.T) {
