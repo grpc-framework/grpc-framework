@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -79,8 +80,14 @@ func TestAuth(t *testing.T) {
 		ctx         context.Context
 		wantCode    codes.Code
 		wantMessage string
-		wantUser    string
-		wantGuest   bool
+		// claims, when set, replaces the issuer's JWT authenticator with
+		// one that accepts any token and returns these claims.
+		claims *auth.Claims
+		// wantAuditError is a substring of the "error" field of the audit
+		// log line; every refusal logs its underlying error.
+		wantAuditError string
+		wantUser       string
+		wantGuest      bool
 	}{
 		{
 			name:      "no authorization header is a guest",
@@ -97,10 +104,11 @@ func TestAuth(t *testing.T) {
 		{
 			// Regression: the untrusted-issuer path passed a nil error to the
 			// audit logger, which dereferenced it and crashed the server.
-			name:        "untrusted issuer",
-			ctx:         contextWithAuthorization("bearer " + newTestToken(t, "evil.example.com", testSharedSecret, time.Hour)),
-			wantCode:    codes.Unauthenticated,
-			wantMessage: "evil.example.com is not a trusted issuer",
+			name:           "untrusted issuer",
+			ctx:            contextWithAuthorization("bearer " + newTestToken(t, "evil.example.com", testSharedSecret, time.Hour)),
+			wantCode:       codes.Unauthenticated,
+			wantMessage:    "evil.example.com is not a trusted issuer",
+			wantAuditError: errIssuerNotTrusted.Error() + ": evil.example.com",
 		},
 		{
 			name:        "missing bearer scheme",
@@ -126,13 +134,32 @@ func TestAuth(t *testing.T) {
 			wantCode:    codes.Unauthenticated,
 			wantMessage: "Unable to authenticate token",
 		},
+		{
+			// The JWT authenticator refuses such claims itself; other
+			// authenticators may return them.
+			name:           "claims without a username",
+			ctx:            contextWithAuthorization("bearer " + newTestToken(t, testIssuer, testSharedSecret, time.Hour)),
+			claims:         &auth.Claims{Issuer: testIssuer},
+			wantCode:       codes.Unauthenticated,
+			wantMessage:    "Unable to get username from token",
+			wantAuditError: "cannot be empty",
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			security := newTestSecurityConfig(t)
+			if tc.claims != nil {
+				authenticator := auth.NewMockAuthenticator(gomock.NewController(t))
+				authenticator.EXPECT().
+					AuthenticateToken(gomock.Any(), gomock.Any()).
+					Return(tc.claims, nil)
+				security.Authenticators[testIssuer] = authenticator
+			}
+
 			var auditLog bytes.Buffer
 			s := &GrpcFrameworkServer{
-				config:         ServerConfig{Security: newTestSecurityConfig(t)},
+				config:         ServerConfig{Security: security},
 				auditLogOutput: &auditLog,
 			}
 
@@ -149,6 +176,8 @@ func TestAuth(t *testing.T) {
 				assert.Equal(t, tc.wantCode, st.Code())
 				assert.Equal(t, tc.wantMessage, st.Message())
 				assert.Contains(t, auditLog.String(), tc.wantMessage)
+				assert.Contains(t, auditLog.String(), "error=")
+				assert.Contains(t, auditLog.String(), tc.wantAuditError)
 				return
 			}
 
@@ -157,6 +186,49 @@ func TestAuth(t *testing.T) {
 			require.True(t, ok, "expected user information in the context")
 			assert.Equal(t, tc.wantGuest, userinfo.IsGuest())
 			assert.Equal(t, tc.wantUser, userinfo.Username)
+		})
+	}
+}
+
+// TestAuditAuthWarningf checks the audit helper of auth(): it logs the
+// underlying error when there is one and takes a nil error. It once called
+// err.Error() on a nil error, and the panic stopped the server.
+func TestAuditAuthWarningf(t *testing.T) {
+	tests := []struct {
+		name      string
+		err       error
+		wantError bool
+	}{
+		{name: "nil error", err: nil, wantError: false},
+		{name: "error", err: errIssuerNotTrusted, wantError: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var auditLog bytes.Buffer
+			s := &GrpcFrameworkServer{auditLogOutput: &auditLog}
+
+			var err error
+			require.NotPanics(t, func() {
+				err = s.auditAuthWarningf(context.Background(), codes.Unauthenticated, tc.err,
+					"%s is not a trusted issuer", "evil.example.com")
+			})
+
+			st, ok := status.FromError(err)
+			require.True(t, ok, "expected a gRPC status error, got %v", err)
+			assert.Equal(t, codes.Unauthenticated, st.Code())
+			assert.Equal(t, "evil.example.com is not a trusted issuer", st.Message())
+
+			line := auditLog.String()
+			assert.Contains(t, line, "evil.example.com is not a trusted issuer")
+			assert.Contains(t, line, "method=Authentication")
+			assert.Contains(t, line, "code=Unauthenticated")
+			if tc.wantError {
+				assert.Contains(t, line, "error=")
+				assert.Contains(t, line, tc.err.Error())
+			} else {
+				assert.NotContains(t, line, "error=")
+			}
 		})
 	}
 }

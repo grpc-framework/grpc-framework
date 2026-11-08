@@ -17,6 +17,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -39,6 +40,10 @@ const (
 	// header: Authorization: bearer <adaf0sdfsd...token>
 	ContextMetadataTokenKey = "bearer"
 )
+
+// errIssuerNotTrusted is the error in the audit log when the issuer of a
+// token has no authenticator in SecurityConfig.Authenticators.
+var errIssuerNotTrusted = errors.New("issuer not trusted")
 
 // This interceptor provides a way to lock out any unary calls while we adjust the server
 func (s *GrpcFrameworkServer) rwlockUnaryIntercepter(
@@ -66,25 +71,31 @@ func (s *GrpcFrameworkServer) rwlockStreamIntercepter(
 	return handler(srv, stream)
 }
 
-// Authenticate user and add authorization information back in the context
-func (s *GrpcFrameworkServer) auth(ctx context.Context) (context.Context, error) {
-	// Audit log
+// auditAuthWarningf writes an authentication failure to the audit log and
+// returns it as a gRPC status error with code c. err is the underlying
+// error, logged in the "error" field; it may be nil.
+func (s *GrpcFrameworkServer) auditAuthWarningf(
+	ctx context.Context,
+	c codes.Code,
+	err error,
+	format string,
+	a ...interface{},
+) error {
 	log := correlation.NewFunctionLogger(ctx)
 	log.Out = s.auditLogOutput
-	// err may be nil when the failure has no underlying error, such as a
-	// token from an untrusted issuer.
-	auditLogWarningf := func(c codes.Code, err error, format string, a ...interface{}) error {
-		fields := logrus.Fields{
-			"method": "Authentication",
-			"code":   c.String(),
-		}
-		if err != nil {
-			fields["error"] = err.Error()
-		}
-		log.WithContext(ctx).WithFields(fields).Warningf(format, a...)
-		return status.Errorf(c, format, a...)
+	fields := logrus.Fields{
+		"method": "Authentication",
+		"code":   c.String(),
 	}
+	if err != nil {
+		fields["error"] = err.Error()
+	}
+	log.WithContext(ctx).WithFields(fields).Warningf(format, a...)
+	return status.Errorf(c, format, a...)
+}
 
+// Authenticate user and add authorization information back in the context
+func (s *GrpcFrameworkServer) auth(ctx context.Context) (context.Context, error) {
 	// guest call attempted, add system.guest user
 	if auth.IsGuest(ctx) {
 		return auth.ContextSaveUserInfo(ctx, auth.NewGuestUser()), nil
@@ -93,27 +104,29 @@ func (s *GrpcFrameworkServer) auth(ctx context.Context) (context.Context, error)
 	// Obtain token from metadata in the context
 	token, err := grpc_auth.AuthFromMD(ctx, ContextMetadataTokenKey)
 	if err != nil {
-		return nil, auditLogWarningf(codes.Unauthenticated, err, "Invalid or missing authentication token")
+		return nil, s.auditAuthWarningf(ctx, codes.Unauthenticated, err, "Invalid or missing authentication token")
 	}
 
 	// Determine issuer
 	issuer, err := auth.TokenIssuer(token)
 	if err != nil {
-		return nil, auditLogWarningf(codes.Unauthenticated, err, "Unable to obtain token issuer from authorization token")
+		return nil, s.auditAuthWarningf(ctx, codes.Unauthenticated, err, "Unable to obtain token issuer from authorization token")
 	}
 
 	// Authenticate user
 	authenticator, ok := s.config.Security.Authenticators[issuer]
 	if !ok {
-		return nil, auditLogWarningf(codes.Unauthenticated, nil, "%s is not a trusted issuer", issuer)
+		return nil, s.auditAuthWarningf(ctx, codes.Unauthenticated,
+			fmt.Errorf("%w: %s", errIssuerNotTrusted, issuer),
+			"%s is not a trusted issuer", issuer)
 	}
 	claims, err := authenticator.AuthenticateToken(ctx, token)
 	if err != nil {
-		return nil, auditLogWarningf(codes.Unauthenticated, err, "Unable to authenticate token")
+		return nil, s.auditAuthWarningf(ctx, codes.Unauthenticated, err, "Unable to authenticate token")
 	}
 	username, err := claims.GetUsername()
 	if err != nil {
-		return nil, auditLogWarningf(codes.Unauthenticated, err, "Unable to get username from token")
+		return nil, s.auditAuthWarningf(ctx, codes.Unauthenticated, err, "Unable to get username from token")
 	}
 	// Add authorization information back into the context so that other
 	// functions can get access to this information.
